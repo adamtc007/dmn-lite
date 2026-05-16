@@ -149,3 +149,12 @@ impl fmt::Display for DecisionId {
         f.write_str(&self.0)
     }
 }
+
+/// A hash of a decision's input or output schema, used to detect mismatches
+/// between a `TypedInputContext` and the decision it is evaluated against.
+///
+/// Computed from the schema's field count, names, types, and domain IDs using
+/// Rust's `DefaultHasher`. Stable within a single process run; not guaranteed
+/// stable across Rust versions or process restarts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SchemaHash(pub u64);

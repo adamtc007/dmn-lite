@@ -61,7 +61,7 @@ pub struct FieldSchema {
 }
 
 /// Resolved type of a field after domain lookup.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ResolvedType {
     /// Enum type: all values must be members of `domain_id`.
     Enum {

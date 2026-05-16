@@ -526,12 +526,68 @@ pub enum CompileWarning {
     },
 }
 
-// ── Legacy stubs ──────────────────────────────────────────────────────────────
+// ── Evaluation errors ─────────────────────────────────────────────────────────
 
-/// Evaluation errors. Variants added in Phase 1.4.
-#[derive(Debug, Error)]
+/// Runtime evaluation errors produced by `dmn-lite-engine`.
+///
+/// `NoMatch` and `MultipleMatches` represent hit-policy outcomes that are
+/// errors within the evaluator. Callers convert them to domain-level outcomes
+/// (e.g., `DecisionOutcome::NoMatch`) at the invocation boundary (V&S §11.4).
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum EvalError {
-    /// Placeholder. Real variants added in Phase 1.4.
-    #[error("eval error: unimplemented in Phase 1.0")]
-    Unimplemented,
+    /// No rule matched under UNIQUE or FIRST hit policy.
+    #[error("no rule matched")]
+    NoMatch,
+
+    /// UNIQUE hit policy found multiple matching rules.
+    #[error("UNIQUE hit policy matched multiple rules: {rules:?}")]
+    MultipleMatches {
+        /// All matching rule IDs in source order.
+        rules: Vec<crate::ids::RuleId>,
+    },
+
+    /// The input slot count does not match the decision's input schema arity.
+    #[error("input slot count {actual} does not match decision input schema arity {expected}")]
+    InputSchemaMismatch {
+        /// Expected (schema arity).
+        expected: usize,
+        /// Actual (slots provided).
+        actual: usize,
+    },
+
+    /// An input value's runtime type does not match the field's declared schema type.
+    #[error(
+        "input field '{field}' (FieldId {field_id}) has type '{actual}' but schema expects '{expected}'"
+    )]
+    InputTypeMismatch {
+        /// Field name.
+        field: String,
+        /// Field ordinal.
+        field_id: crate::ids::FieldId,
+        /// Expected type name.
+        expected: String,
+        /// Actual type name.
+        actual: String,
+    },
+
+    /// An enum input value's domain does not match the field's declared domain.
+    #[error(
+        "input field '{field}' (FieldId {field_id}) value has domain mismatch; expected domain '{domain}'"
+    )]
+    InputDomainMismatch {
+        /// Field name.
+        field: String,
+        /// Field ordinal.
+        field_id: crate::ids::FieldId,
+        /// Expected domain ID (as string).
+        domain: String,
+        /// Symbol or value description provided (best-effort).
+        symbol: String,
+    },
+
+    /// The `TypedInputContext` was built against a different schema than the decision.
+    #[error(
+        "schema hash mismatch: input context was built for a different schema than the decision"
+    )]
+    SchemaHashMismatch,
 }

@@ -1,20 +1,15 @@
-//! dmn-lite engine: stack VM and reference evaluator.
+//! dmn-lite engine: reference evaluator and (future) bytecode stack VM.
 //!
-//! Contains two evaluators sharing the same input/output contract:
-//!
-//! - [`vm`] module: production bytecode stack machine (Phase 1.4).
-//!   Evaluates the compiled decision program using a data stack, return
-//!   stack, typed input frame, and result accumulator. Never tree-walks
-//!   the AST in the hot path.
+//! Two evaluators share the same input/output contract:
 //!
 //! - [`reference`] module: reference evaluator over typed predicate IR
 //!   (Phase 1.3). Used as the differential testing oracle for the VM.
-//!   Correct but not optimised; replaced by the VM in production paths.
+//!   Correct but not optimised; never short-circuits.
+//!
+//! - [`vm`] module: production bytecode stack machine (Phase 1.4, stub).
 //!
 //! The engine depends only on `dmn-lite-types`. It has no knowledge of the
-//! compiler implementation — only of the [`CompiledDecision`] artifact shape.
-//!
-//! Phase 1.0 status: skeleton only.
+//! compiler implementation — only of the [`TypedDecision`] artifact shape.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -22,21 +17,24 @@
 pub mod reference;
 pub mod vm;
 
-use dmn_lite_types::{CompiledDecision, EvalError, TypedInputContext, TypedOutputContext};
+use dmn_lite_types::ir::TypedDecision;
+use dmn_lite_types::{EvalError, TypedInputContext};
+
+pub use reference::{EvaluationOutput, evaluate as reference_evaluate};
 
 /// Evaluate a compiled decision against a typed input context.
 ///
-/// Runs the bytecode VM (Phase 1.4) against the supplied input frame and
-/// returns the typed output bindings from the matched rule(s). For differential
-/// testing, use [`reference::evaluate`] as the oracle.
+/// **Phase 1.3:** delegates to [`reference::evaluate`]. Phase 1.4 will
+/// re-route this to the bytecode VM, retaining the reference evaluator as a
+/// debugging/oracle mode.
 ///
-/// Returns an [`EvalError`] for input type mismatches, missing required inputs,
-/// or hit-policy violations (e.g., multiple matches under `UNIQUE`).
-///
-/// Phase 1.0: returns `unimplemented!()`. Real implementation in Phase 1.4.
+/// The `source` string is forwarded to the reference evaluator for
+/// human-readable predicate descriptions in the evaluation trace. Pass `""`
+/// if the original source is unavailable.
 pub fn evaluate(
-    _decision: &CompiledDecision,
-    _input: &TypedInputContext,
-) -> Result<TypedOutputContext, EvalError> {
-    unimplemented!("dmn-lite-engine: evaluate() not implemented until Phase 1.4")
+    decision: &TypedDecision,
+    input: &TypedInputContext,
+    source: &str,
+) -> Result<EvaluationOutput, EvalError> {
+    reference::evaluate(decision, input, source)
 }

@@ -37,6 +37,7 @@ dependencies = [
 name = "dmn-lite-compiler"
 version = "0.1.0"
 dependencies = [
+ "dmn-lite-engine",
  "dmn-lite-parser",
  "dmn-lite-types",
  "serde",
@@ -49,6 +50,8 @@ dependencies = [
 name = "dmn-lite-engine"
 version = "0.1.0"
 dependencies = [
+ "dmn-lite-compiler",
+ "dmn-lite-parser",
  "dmn-lite-types",
 ]
 

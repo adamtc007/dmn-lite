@@ -16,10 +16,17 @@ pub mod ids;
 pub mod instr;
 pub mod ir;
 pub mod predicates;
+pub mod trace;
 pub mod values;
 
 pub use catalogue::{Catalogue, Domain, DomainValue};
 pub use compiled::{AnalysisReport, CompiledDecision};
 pub use errors::{CatalogueError, CompileError, CompileWarning, EvalError, ParseError};
-pub use ids::{DecisionId, DomainId, FieldId, NumberKind, RuleId, SnapshotId, SourceSpan, ValueId};
-pub use values::{TypedInputContext, TypedOutputContext};
+pub use ids::{
+    DecisionId, DomainId, FieldId, NumberKind, RuleId, SchemaHash, SnapshotId, SourceSpan, ValueId,
+};
+pub use trace::{EvaluationTrace, PredicateTrace, RuleTrace, TraceOutcome};
+pub use values::{
+    InputContextError, TypedInputContext, TypedInputContextBuilder, TypedOutputContext,
+    compute_schema_hash,
+};
