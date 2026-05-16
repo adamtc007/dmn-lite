@@ -161,10 +161,3 @@ impl VerifiedDecision {
         &self.0
     }
 }
-
-// ── AnalysisReport ────────────────────────────────────────────────────────────
-
-/// Static analysis report from `dmn-lite-analysis` (Phase 1.6 placeholder).
-pub struct AnalysisReport {
-    _private: (),
-}

@@ -10,3 +10,7 @@ description = "dmn-lite static analysis: overlap, gap, unreachable rules, hit-po
 
 [dependencies]
 dmn-lite-types = { path = "../dmn-lite-types" }
+
+[dev-dependencies]
+dmn-lite-compiler = { path = "../dmn-lite-compiler" }
+dmn-lite-parser = { path = "../dmn-lite-parser" }

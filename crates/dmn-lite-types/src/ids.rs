@@ -78,7 +78,7 @@ pub struct SnapshotId(pub Uuid);
 /// Stored as a UUIDv7. Stable across catalogue snapshot versions when the
 /// domain itself is unchanged; a new `DomainId` is issued when the domain
 /// is superseded.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DomainId(pub Uuid);
 
 /// Unique identifier for a single enum value within a domain.
@@ -86,7 +86,7 @@ pub struct DomainId(pub Uuid);
 /// Stored as a UUIDv7. Together with its parent `DomainId`, a `ValueId`
 /// forms the early-bound canonical reference to an enum literal in compiled
 /// decisions and audit logs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ValueId(pub Uuid);
 
 impl fmt::Display for SnapshotId {

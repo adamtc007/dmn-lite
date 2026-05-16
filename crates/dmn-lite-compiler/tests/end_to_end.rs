@@ -213,3 +213,38 @@ fn vm_e2e_booking_eligibility_r001_matches() {
         &enum_val(&catalogue, "BookingReasonCode", "STANDARD_LUX_SICAV")
     );
 }
+
+/// Phase 1.6 workspace-level e2e analysis test:
+/// source → parse → compile_and_verify → analyse.
+///
+/// Proves the full Phase 1 lifecycle composes correctly: parse, compile, verify,
+/// (evaluate above), analyse.  The vertical slice is complete after this test.
+#[test]
+fn vertical_slice_with_analysis() {
+    let src = BOOKING_SRC;
+    let catalogue = load_catalogue_from_str(STUB).expect("catalogue must load");
+    let verified = compile_and_verify(parse(src).unwrap(), &catalogue, src)
+        .expect("compile_and_verify must succeed");
+
+    let report = dmn_lite_analysis::analyse(&verified, &catalogue);
+
+    // booking_eligibility uses FIRST + catch-all → no SA-001.
+    assert!(
+        !report.findings.iter().any(|f| matches!(
+            f.kind,
+            dmn_lite_types::FindingKind::UniqueWithCatchAll { .. }
+        )),
+        "FIRST + catch-all should not trigger SA-001"
+    );
+
+    // Cost bound: r001 has 5 predicates, r002 has 1, catch-all has 0 → 6.
+    assert_eq!(report.cost_bound.total_predicates, 6);
+    assert!(report.cost_bound.exact);
+
+    // Catch-all covers gap → no Warning-severity Gap finding (Info is fine).
+    let warning_gap = report.findings.iter().any(|f| {
+        f.severity == dmn_lite_types::Severity::Warning
+            && matches!(f.kind, dmn_lite_types::FindingKind::Gap { .. })
+    });
+    assert!(!warning_gap, "catch-all covers gap; no Warning expected");
+}

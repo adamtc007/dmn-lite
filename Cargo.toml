@@ -6,6 +6,7 @@ members = [
     "crates/dmn-lite-compiler",
     "crates/dmn-lite-analysis",
     "crates/dmn-lite-engine",
+    "crates/dmn-lite-bridge",
 ]
 
 [workspace.package]

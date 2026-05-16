@@ -19,3 +19,4 @@ blake3 = "1"
 
 [dev-dependencies]
 dmn-lite-engine = { path = "../dmn-lite-engine" }
+dmn-lite-analysis = { path = "../dmn-lite-analysis" }

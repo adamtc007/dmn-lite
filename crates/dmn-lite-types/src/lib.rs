@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod analysis;
 pub mod ast;
 pub mod catalogue;
 pub mod compiled;
@@ -19,10 +20,13 @@ pub mod predicates;
 pub mod trace;
 pub mod values;
 
+pub use analysis::{
+    AnalysisFinding, AnalysisReport, CostBound, FieldOverlap, FindingKind, GapSummary,
+    OverlapSummary, Severity, UncoveredInputExample,
+};
 pub use catalogue::{Catalogue, Domain, DomainValue};
 pub use compiled::{
-    AnalysisReport, ArtifactHash, CompileContext, CompiledDecision, RangeEntry, RuleMapEntry,
-    VerifiedDecision,
+    ArtifactHash, CompileContext, CompiledDecision, RangeEntry, RuleMapEntry, VerifiedDecision,
 };
 pub use errors::{CatalogueError, CompileError, CompileWarning, EvalError, ParseError};
 pub use ids::{
