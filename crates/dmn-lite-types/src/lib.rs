@@ -26,7 +26,7 @@ pub use compiled::{
 };
 pub use errors::{CatalogueError, CompileError, CompileWarning, EvalError, ParseError};
 pub use ids::{
-    AggregateOpKind, BkmId, BindingId, ConstId, ConstSetId, DecisionId, DomainId, FieldId,
+    AggregateOpKind, BindingId, BkmId, ConstId, ConstSetId, DecisionId, DomainId, FieldId,
     NumberKind, OutputFieldId, PathId, RangeId, RuleId, SchemaHash, SnapshotId, SourceSpan,
     ValueId,
 };

@@ -100,7 +100,11 @@ fn serialise_entity_refs(entities: &[EntityRef]) -> Vec<u8> {
 
 // ── IR serialisation ──────────────────────────────────────────────────────────
 
-fn serialise_ir(instructions: &[Instr], const_pool: &[TypedValue], range_pool: &[RangeEntry]) -> Vec<u8> {
+fn serialise_ir(
+    instructions: &[Instr],
+    const_pool: &[TypedValue],
+    range_pool: &[RangeEntry],
+) -> Vec<u8> {
     let mut out = Vec::new();
     // Instruction stream
     out.extend((instructions.len() as u32).to_le_bytes());
@@ -121,11 +125,21 @@ fn serialise_ir(instructions: &[Instr], const_pool: &[TypedValue], range_pool: &
         out.push(r.upper_inclusive as u8);
         match &r.lower {
             None => out.push(0),
-            Some(v) => { out.push(1); let b = serialize_typed_value(v); out.extend((b.len() as u32).to_le_bytes()); out.extend(&b); }
+            Some(v) => {
+                out.push(1);
+                let b = serialize_typed_value(v);
+                out.extend((b.len() as u32).to_le_bytes());
+                out.extend(&b);
+            }
         }
         match &r.upper {
             None => out.push(0),
-            Some(v) => { out.push(1); let b = serialize_typed_value(v); out.extend((b.len() as u32).to_le_bytes()); out.extend(&b); }
+            Some(v) => {
+                out.push(1);
+                let b = serialize_typed_value(v);
+                out.extend((b.len() as u32).to_le_bytes());
+                out.extend(&b);
+            }
         }
     }
     out
@@ -133,49 +147,95 @@ fn serialise_ir(instructions: &[Instr], const_pool: &[TypedValue], range_pool: &
 
 fn serialise_instr(out: &mut Vec<u8>, instr: &Instr) {
     match instr {
-        Instr::LoadField(f)        => { out.push(0x01); out.extend(f.0.to_le_bytes()); }
-        Instr::PushConst(c)        => { out.push(0x02); out.extend(c.0.to_le_bytes()); }
-        Instr::PushConstSet(s)     => { out.push(0x03); out.extend(s.0.to_le_bytes()); }
-        Instr::Pop                 => out.push(0x04),
-        Instr::Dup                 => out.push(0x05),
-        Instr::Eq                  => out.push(0x10),
-        Instr::NotEq               => out.push(0x11),
-        Instr::Lt                  => out.push(0x12),
-        Instr::Le                  => out.push(0x13),
-        Instr::Gt                  => out.push(0x14),
-        Instr::Ge                  => out.push(0x15),
-        Instr::InSet               => out.push(0x20),
-        Instr::RangeCheck(r)       => { out.push(0x21); out.extend(r.0.to_le_bytes()); }
-        Instr::IsNull              => out.push(0x30),
-        Instr::IsNotNull           => out.push(0x31),
-        Instr::And                 => out.push(0x40),
-        Instr::Or                  => out.push(0x41),
-        Instr::Not                 => out.push(0x42),
-        Instr::Br(a)               => { out.push(0x50); out.extend(a.to_le_bytes()); }
-        Instr::BrFalse(a)          => { out.push(0x51); out.extend(a.to_le_bytes()); }
-        Instr::BrTrue(a)           => { out.push(0x52); out.extend(a.to_le_bytes()); }
-        Instr::RuleMatched(r)      => { out.push(0x60); out.extend((r.0 as u32).to_le_bytes()); }
-        Instr::StoreOutputTos(f)   => { out.push(0x61); out.extend(f.0.to_le_bytes()); }
-        Instr::StoreOutput(f, c)   => { out.push(0x62); out.extend(f.0.to_le_bytes()); out.extend(c.0.to_le_bytes()); }
-        Instr::EndDecision         => out.push(0x70),
+        Instr::LoadField(f) => {
+            out.push(0x01);
+            out.extend(f.0.to_le_bytes());
+        }
+        Instr::PushConst(c) => {
+            out.push(0x02);
+            out.extend(c.0.to_le_bytes());
+        }
+        Instr::PushConstSet(s) => {
+            out.push(0x03);
+            out.extend(s.0.to_le_bytes());
+        }
+        Instr::Pop => out.push(0x04),
+        Instr::Dup => out.push(0x05),
+        Instr::Eq => out.push(0x10),
+        Instr::NotEq => out.push(0x11),
+        Instr::Lt => out.push(0x12),
+        Instr::Le => out.push(0x13),
+        Instr::Gt => out.push(0x14),
+        Instr::Ge => out.push(0x15),
+        Instr::InSet => out.push(0x20),
+        Instr::RangeCheck(r) => {
+            out.push(0x21);
+            out.extend(r.0.to_le_bytes());
+        }
+        Instr::IsNull => out.push(0x30),
+        Instr::IsNotNull => out.push(0x31),
+        Instr::And => out.push(0x40),
+        Instr::Or => out.push(0x41),
+        Instr::Not => out.push(0x42),
+        Instr::Br(a) => {
+            out.push(0x50);
+            out.extend(a.to_le_bytes());
+        }
+        Instr::BrFalse(a) => {
+            out.push(0x51);
+            out.extend(a.to_le_bytes());
+        }
+        Instr::BrTrue(a) => {
+            out.push(0x52);
+            out.extend(a.to_le_bytes());
+        }
+        Instr::RuleMatched(r) => {
+            out.push(0x60);
+            out.extend((r.0 as u32).to_le_bytes());
+        }
+        Instr::StoreOutputTos(f) => {
+            out.push(0x61);
+            out.extend(f.0.to_le_bytes());
+        }
+        Instr::StoreOutput(f, c) => {
+            out.push(0x62);
+            out.extend(f.0.to_le_bytes());
+            out.extend(c.0.to_le_bytes());
+        }
+        Instr::EndDecision => out.push(0x70),
         // Reserved — should not appear in v0.1 artifacts, but serialise for completeness.
-        Instr::Call(b)             => { out.push(0xE0); out.extend(b.0.to_le_bytes()); }
-        Instr::Return              => out.push(0xE1),
-        Instr::ForAllBegin { collection, bound_var, end } => {
+        Instr::Call(b) => {
+            out.push(0xE0);
+            out.extend(b.0.to_le_bytes());
+        }
+        Instr::Return => out.push(0xE1),
+        Instr::ForAllBegin {
+            collection,
+            bound_var,
+            end,
+        } => {
             out.push(0xE2);
             out.extend(collection.0.to_le_bytes());
             out.extend(bound_var.0.to_le_bytes());
             out.extend(end.to_le_bytes());
         }
-        Instr::ForAllEnd           => out.push(0xE3),
-        Instr::AggregateBegin { collection, bound_var, op, end } => {
+        Instr::ForAllEnd => out.push(0xE3),
+        Instr::AggregateBegin {
+            collection,
+            bound_var,
+            op,
+            end,
+        } => {
             out.push(0xE4);
             out.extend(collection.0.to_le_bytes());
             out.extend(bound_var.0.to_le_bytes());
             out.push(*op as u8);
             out.extend(end.to_le_bytes());
         }
-        Instr::AggregateEnd        => out.push(0xE5),
-        Instr::LoadPath(p)         => { out.push(0xE6); out.extend(p.0.to_le_bytes()); }
+        Instr::AggregateEnd => out.push(0xE5),
+        Instr::LoadPath(p) => {
+            out.push(0xE6);
+            out.extend(p.0.to_le_bytes());
+        }
     }
 }

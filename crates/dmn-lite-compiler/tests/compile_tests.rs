@@ -2,7 +2,9 @@
 //! Happy-path, field resolution, type checking, structural, warnings,
 //! determinism, and multi-error tests.
 
-use dmn_lite_compiler::{CompileError, compile_to_ir, lower_to_ir_with_warnings, load_catalogue_from_str};
+use dmn_lite_compiler::{
+    CompileError, compile_to_ir, load_catalogue_from_str, lower_to_ir_with_warnings,
+};
 use dmn_lite_parser::parse;
 use dmn_lite_types::{
     CompileWarning as W,

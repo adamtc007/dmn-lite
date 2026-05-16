@@ -4,7 +4,9 @@
 //! correctly across all three crates: parser, compiler, engine.
 //! Phase 1.4 adds one VM path test: compile_and_verify → vm::evaluate.
 
-use dmn_lite_compiler::{compile_to_ir, compile_and_verify, lower_to_ir_with_warnings, load_catalogue_from_str};
+use dmn_lite_compiler::{
+    compile_and_verify, compile_to_ir, load_catalogue_from_str, lower_to_ir_with_warnings,
+};
 use dmn_lite_engine::{reference::evaluate, vm};
 use dmn_lite_parser::parse;
 use dmn_lite_types::{RuleId, TraceOutcome, ir::TypedValue, values::TypedInputContextBuilder};
@@ -169,19 +171,45 @@ fn vm_e2e_booking_eligibility_r001_matches() {
     let compiled = verified.as_compiled();
 
     let mut b = TypedInputContextBuilder::new(&compiled.input_schema);
-    b.set_by_name("jurisdiction", enum_val(&catalogue, "Jurisdiction", "LU")).unwrap();
-    b.set_by_name("client-type", enum_val(&catalogue, "CbuType", "SICAV")).unwrap();
-    b.set_by_name("product", enum_val(&catalogue, "ProductCode", "CUSTODY")).unwrap();
-    b.set_by_name("booking-principal", enum_val(&catalogue, "BookingPrincipal", "BNY_LUX")).unwrap();
-    b.set_by_name("source-of-funds", enum_val(&catalogue, "SourceOfFunds", "SALARY")).unwrap();
+    b.set_by_name("jurisdiction", enum_val(&catalogue, "Jurisdiction", "LU"))
+        .unwrap();
+    b.set_by_name("client-type", enum_val(&catalogue, "CbuType", "SICAV"))
+        .unwrap();
+    b.set_by_name("product", enum_val(&catalogue, "ProductCode", "CUSTODY"))
+        .unwrap();
+    b.set_by_name(
+        "booking-principal",
+        enum_val(&catalogue, "BookingPrincipal", "BNY_LUX"),
+    )
+    .unwrap();
+    b.set_by_name(
+        "source-of-funds",
+        enum_val(&catalogue, "SourceOfFunds", "SALARY"),
+    )
+    .unwrap();
     let ctx = b.build();
 
     let result = vm::evaluate(&verified, &ctx, src).expect("VM must succeed");
     // FIRST returns r001 (rule_id = 0).
-    assert_eq!(result.trace.outcome, TraceOutcome::Match { rule_id: RuleId(0) });
+    assert_eq!(
+        result.trace.outcome,
+        TraceOutcome::Match { rule_id: RuleId(0) }
+    );
     // Output matches reference evaluator.
-    let eligibility = result.output.get_by_name(&compiled.output_schema, "eligibility").unwrap();
-    assert_eq!(eligibility, &enum_val(&catalogue, "EligibilityOutcome", "ELIGIBLE"));
-    let reason = result.output.get_by_name(&compiled.output_schema, "reason-code").unwrap();
-    assert_eq!(reason, &enum_val(&catalogue, "BookingReasonCode", "STANDARD_LUX_SICAV"));
+    let eligibility = result
+        .output
+        .get_by_name(&compiled.output_schema, "eligibility")
+        .unwrap();
+    assert_eq!(
+        eligibility,
+        &enum_val(&catalogue, "EligibilityOutcome", "ELIGIBLE")
+    );
+    let reason = result
+        .output
+        .get_by_name(&compiled.output_schema, "reason-code")
+        .unwrap();
+    assert_eq!(
+        reason,
+        &enum_val(&catalogue, "BookingReasonCode", "STANDARD_LUX_SICAV")
+    );
 }

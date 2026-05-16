@@ -367,3 +367,25 @@ A `CompiledDecision` is well-formed if and only if:
 5. **Output frame completeness.** On every execution path that reaches `EndDecision` through a `RuleMatched` instruction, every declared output field has been stored exactly once via `StoreOutput`. Paths that reach `EndDecision` without a `RuleMatched` (the no-match path) leave the output frame empty.
 
 The Phase 1.4 verifier validates these invariants on every `CompiledDecision` before it is published. A verification failure is an internal compiler error (not a user diagnostic).
+
+
+---
+
+## 8. Reference evaluator equivalence
+
+The reference evaluator (`dmn_lite_engine::reference::evaluate`) is the canonical oracle for
+the bytecode VM.  For any well-typed input, both must produce equivalent results:
+
+- **`TraceOutcome`** must be identical (`Match { rule_id }`, `NoMatch`, or `MultipleMatches`).
+- **Output bindings** must be byte-equal for all declared output fields.
+- **Matched-rule predicate traces** must be element-wise identical (same results, same spans).
+- **Non-matched-rule predicate traces**: the VM may short-circuit, so its predicate list for a
+  non-matched rule is a valid strict prefix of the reference trace for the same rule.
+- **Short-circuited rules** (rules never entered by the VM under `FIRST` after a match): the VM
+  emits stub traces (`matched = false, predicates = []`); these are excluded from the matched-flag
+  comparison because the reference evaluator has no short-circuit and evaluates all rules.
+
+Phase 1.5's differential testing harness (`dmn-lite-engine/tests/differential/`) runs this
+equivalence check across ≥1000 generated inputs per fixture using property-based testing
+(`proptest`).  As of Phase 1.5, a known divergence exists in `Instr::NotEq` null handling;
+see `todo/dmn-lite/bug-phase-1-5-vm-not-eq-null-semantics.md`.

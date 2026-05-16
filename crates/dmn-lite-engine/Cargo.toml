@@ -15,3 +15,4 @@ smallvec = { workspace = true }
 [dev-dependencies]
 dmn-lite-compiler = { path = "../dmn-lite-compiler" }
 dmn-lite-parser = { path = "../dmn-lite-parser" }
+proptest = "1"

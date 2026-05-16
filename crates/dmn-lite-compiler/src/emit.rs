@@ -11,11 +11,14 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use dmn_lite_types::{
+    SourceSpan,
     compiled::{CompileContext, CompiledDecision, RangeEntry, RuleMapEntry},
     ids::{ConstId, ConstSetId, FieldId, OutputFieldId, RangeId},
     instr::Instr,
-    ir::{ComparisonOp, HitPolicy, TypedAssignment, TypedDecision, TypedPredicate, TypedValue, TypedWhen},
-    SourceSpan,
+    ir::{
+        ComparisonOp, HitPolicy, TypedAssignment, TypedDecision, TypedPredicate, TypedValue,
+        TypedWhen,
+    },
 };
 
 use crate::hash::compute_artifact_hash;
@@ -41,7 +44,7 @@ struct EmitContext {
     rule_map: Vec<RuleMapEntry>,
 
     // Pending branch-target patches: instruction indices of Br(MAX) to patch.
-    patches_end: Vec<usize>,  // Br(placeholder) that must jump to EndDecision
+    patches_end: Vec<usize>, // Br(placeholder) that must jump to EndDecision
 }
 
 impl EmitContext {
@@ -84,9 +87,7 @@ impl EmitContext {
 
     fn intern_const_set(&mut self, mut values: Vec<TypedValue>) -> ConstSetId {
         // Canonically sort set members for deterministic deduplication.
-        values.sort_by(|a, b| {
-            serialize_typed_value(a).cmp(&serialize_typed_value(b))
-        });
+        values.sort_by_key(serialize_typed_value);
         values.dedup_by(|a, b| serialize_typed_value(a) == serialize_typed_value(b));
         let keys: Vec<Vec<u8>> = values.iter().map(serialize_typed_value).collect();
         if let Some(&idx) = self.const_set_pool_keys.get(&keys) {
@@ -110,18 +111,29 @@ impl EmitContext {
         key.push(upper_inclusive as u8);
         match &lower {
             None => key.push(0),
-            Some(v) => { key.push(1); key.extend(serialize_typed_value(v)); }
+            Some(v) => {
+                key.push(1);
+                key.extend(serialize_typed_value(v));
+            }
         }
         match &upper {
             None => key.push(0),
-            Some(v) => { key.push(1); key.extend(serialize_typed_value(v)); }
+            Some(v) => {
+                key.push(1);
+                key.extend(serialize_typed_value(v));
+            }
         }
         if let Some(&idx) = self.range_pool_keys.get(&key) {
             return RangeId(idx);
         }
         let idx = self.range_pool.len() as u32;
         self.range_pool_keys.insert(key, idx);
-        self.range_pool.push(RangeEntry { lower, upper, lower_inclusive, upper_inclusive });
+        self.range_pool.push(RangeEntry {
+            lower,
+            upper,
+            lower_inclusive,
+            upper_inclusive,
+        });
         RangeId(idx)
     }
 }
@@ -202,17 +214,22 @@ pub fn emit(typed: TypedDecision, source_text: &str) -> CompiledDecision {
     }
 
     // Const-set pool: convert Vec<TypedValue> → Arc<[TypedValue]>
-    let const_set_pool: Vec<Arc<[TypedValue]>> = ctx
-        .const_set_pool
-        .into_iter()
-        .map(|v| v.into())
-        .collect();
+    let const_set_pool: Vec<Arc<[TypedValue]>> =
+        ctx.const_set_pool.into_iter().map(|v| v.into()).collect();
 
     // Compute artifact hash.
-    let artifact_hash = compute_artifact_hash(source_text, &typed, &ctx.instructions, &ctx.const_pool, &ctx.range_pool);
+    let artifact_hash = compute_artifact_hash(
+        source_text,
+        &typed,
+        &ctx.instructions,
+        &ctx.const_pool,
+        &ctx.range_pool,
+    );
 
     let compile_context = CompileContext {
-        sem_os_snapshot_id: typed.resolved_entities.first()
+        sem_os_snapshot_id: typed
+            .resolved_entities
+            .first()
             .map(|_| dmn_lite_types::SnapshotId(uuid::Uuid::nil()))
             .unwrap_or(dmn_lite_types::SnapshotId(uuid::Uuid::nil())),
         compiled_at: SystemTime::now(),
@@ -259,14 +276,38 @@ fn emit_assignments(ctx: &mut EmitContext, assignments: &[TypedAssignment], _sou
 /// rule-:when level.
 fn emit_predicate_nested(ctx: &mut EmitContext, pred: &TypedPredicate, _source: &str) {
     match pred {
-        TypedPredicate::Comparison { field, op, rhs, source_span } => {
+        TypedPredicate::Comparison {
+            field,
+            op,
+            rhs,
+            source_span,
+        } => {
             emit_comparison(ctx, *field, *op, rhs, *source_span);
         }
-        TypedPredicate::InSet { field, values, source_span } => {
+        TypedPredicate::InSet {
+            field,
+            values,
+            source_span,
+        } => {
             emit_in_set(ctx, *field, values, *source_span);
         }
-        TypedPredicate::Range { field, lower, upper, lower_inclusive, upper_inclusive, source_span } => {
-            emit_range(ctx, *field, lower, upper, *lower_inclusive, *upper_inclusive, *source_span);
+        TypedPredicate::Range {
+            field,
+            lower,
+            upper,
+            lower_inclusive,
+            upper_inclusive,
+            source_span,
+        } => {
+            emit_range(
+                ctx,
+                *field,
+                lower,
+                upper,
+                *lower_inclusive,
+                *upper_inclusive,
+                *source_span,
+            );
         }
         TypedPredicate::IsNull { field, source_span } => {
             emit_null_test(ctx, *field, true, *source_span);
@@ -330,7 +371,12 @@ fn emit_range(
     span: SourceSpan,
 ) {
     ctx.emit(Instr::LoadField(field), span);
-    let rid = ctx.intern_range(lower.clone(), upper.clone(), lower_inclusive, upper_inclusive);
+    let rid = ctx.intern_range(
+        lower.clone(),
+        upper.clone(),
+        lower_inclusive,
+        upper_inclusive,
+    );
     ctx.emit(Instr::RangeCheck(rid), span);
 }
 
@@ -404,15 +450,27 @@ pub(crate) fn serialize_typed_value(v: &TypedValue) -> Vec<u8> {
     let mut out = Vec::new();
     match v {
         TV::Null => out.push(0x00),
-        TV::Bool(b) => { out.push(0x01); out.push(*b as u8); }
-        TV::Integer(i) => { out.push(0x02); out.extend(i.to_le_bytes()); }
-        TV::Decimal(f) => { out.push(0x03); out.extend(f.to_bits().to_le_bytes()); }
+        TV::Bool(b) => {
+            out.push(0x01);
+            out.push(*b as u8);
+        }
+        TV::Integer(i) => {
+            out.push(0x02);
+            out.extend(i.to_le_bytes());
+        }
+        TV::Decimal(f) => {
+            out.push(0x03);
+            out.extend(f.to_bits().to_le_bytes());
+        }
         TV::Str(s) => {
             out.push(0x04);
             out.extend((s.len() as u32).to_le_bytes());
             out.extend(s.as_bytes());
         }
-        TV::Enum { domain_id, value_id } => {
+        TV::Enum {
+            domain_id,
+            value_id,
+        } => {
             out.push(0x05);
             out.extend(domain_id.0.as_bytes());
             out.extend(value_id.0.as_bytes());

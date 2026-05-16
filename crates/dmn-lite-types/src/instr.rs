@@ -19,7 +19,6 @@ use crate::ids::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Instr {
     // === Stack manipulation (§3.1) ===
-
     /// Push an input field's value onto the data stack.
     ///
     /// Stack: `[] → [value]`
@@ -46,7 +45,6 @@ pub enum Instr {
     Dup,
 
     // === Comparison (§3.2) ===
-
     /// `a == b` under typed equality.
     ///
     /// Stack: `[a, b] → [bool]`
@@ -78,21 +76,18 @@ pub enum Instr {
     Ge,
 
     // === Set membership (§3.3) ===
-
     /// `value ∈ set` — set membership test.
     ///
     /// Stack: `[value, set] → [bool]`
     InSet,
 
     // === Range tests (§3.4) ===
-
     /// Range membership test against a precompiled range from the pool.
     ///
     /// Stack: `[value] → [bool]`
     RangeCheck(RangeId),
 
     // === Null tests (§3.5) ===
-
     /// `value is null` — true for missing or explicit-null values.
     ///
     /// Stack: `[value] → [bool]`
@@ -104,7 +99,6 @@ pub enum Instr {
     IsNotNull,
 
     // === Boolean combinators (§3.6) ===
-
     /// `a && b` — both operands already on the stack (no short-circuit).
     ///
     /// Stack: `[a, b] → [bool]`
@@ -121,7 +115,6 @@ pub enum Instr {
     Not,
 
     // === Control flow (§3.7) ===
-
     /// Unconditional jump to an absolute instruction address.
     ///
     /// Stack: no effect
@@ -138,7 +131,6 @@ pub enum Instr {
     BrTrue(u32),
 
     // === Rule and output (§3.8) ===
-
     /// Record that rule `RuleId` has matched in the accumulator.
     ///
     /// Stack: no effect
@@ -163,7 +155,6 @@ pub enum Instr {
     // === Reserved for future profiles (§3.9) ===
     // The v0.1 emitter MUST NOT produce these.  The verifier rejects any
     // v0.1 artifact that contains them.
-
     /// (Profile v0.5+) Call a governed function / BKM.
     #[doc(hidden)]
     Call(BkmId),

@@ -4,9 +4,7 @@ use dmn_lite_compiler::{compile_and_verify, load_catalogue_from_str};
 use dmn_lite_engine::vm;
 use dmn_lite_parser::parse;
 use dmn_lite_types::{
-    FieldId, RuleId, TraceOutcome,
-    ir::TypedValue,
-    values::TypedInputContextBuilder,
+    FieldId, RuleId, TraceOutcome, ir::TypedValue, values::TypedInputContextBuilder,
 };
 
 const INT_CAT: &str = r#"
@@ -78,7 +76,10 @@ fn first_skipped_rules_have_empty_predicate_trace() {
     let out = vm::evaluate(&d, &b.build(), src).unwrap();
     assert_eq!(out.trace.rules.len(), 3);
     // r002 was never entered
-    assert!(out.trace.rules[1].predicates.is_empty(), "r002 skipped — no predicates");
+    assert!(
+        out.trace.rules[1].predicates.is_empty(),
+        "r002 skipped — no predicates"
+    );
 }
 
 #[test]
@@ -178,7 +179,10 @@ fn trace_outcome_match_correct_rule_id() {
     let mut b = TypedInputContextBuilder::new(&d.as_compiled().input_schema);
     b.set(FieldId(0), TypedValue::Integer(2));
     let out = vm::evaluate(&d, &b.build(), src).unwrap();
-    assert_eq!(out.trace.outcome, TraceOutcome::Match { rule_id: RuleId(1) });
+    assert_eq!(
+        out.trace.outcome,
+        TraceOutcome::Match { rule_id: RuleId(1) }
+    );
 }
 
 // ── Predicate descriptions ────────────────────────────────────────────────────
@@ -196,5 +200,8 @@ fn predicate_descriptions_non_empty_when_source_supplied() {
     let out = vm::evaluate(&d, &b.build(), src).unwrap();
     let r001_preds = &out.trace.rules[0].predicates;
     assert!(!r001_preds.is_empty());
-    assert!(!r001_preds[0].description.is_empty(), "non-empty description with source");
+    assert!(
+        !r001_preds[0].description.is_empty(),
+        "non-empty description with source"
+    );
 }

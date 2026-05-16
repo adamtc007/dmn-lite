@@ -25,7 +25,10 @@ pub enum VerifierError {
     #[error(
         "instructions/source_spans length mismatch: instructions={instructions}, source_spans={source_spans}"
     )]
-    InstructionSpanLengthMismatch { instructions: usize, source_spans: usize },
+    InstructionSpanLengthMismatch {
+        instructions: usize,
+        source_spans: usize,
+    },
 
     /// A branch target address is out of bounds.
     #[error("branch target {target} out of bounds (instructions.len = {len}) at instruction {at}")]
@@ -73,11 +76,21 @@ pub enum VerifierError {
 
     /// A type mismatch was detected in the abstract interpretation.
     #[error("type mismatch at instruction {at}: expected {expected}, found {found}")]
-    TypeMismatch { at: u32, expected: String, found: String },
+    TypeMismatch {
+        at: u32,
+        expected: String,
+        found: String,
+    },
 
     /// An instruction requires more stack values than are available.
-    #[error("stack underflow at instruction {at}: expected {expected} operands, stack has {actual}")]
-    StackUnderflow { at: u32, expected: usize, actual: usize },
+    #[error(
+        "stack underflow at instruction {at}: expected {expected} operands, stack has {actual}"
+    )]
+    StackUnderflow {
+        at: u32,
+        expected: usize,
+        actual: usize,
+    },
 
     /// Two execution paths reaching the same instruction have different stack heights.
     #[error("stack height mismatch at branch join {at}: paths produce heights {heights:?}")]
@@ -138,9 +151,7 @@ pub fn verify(decision: CompiledDecision) -> Result<VerifiedDecision, VerifierEr
     for (i, instr) in instrs.iter().enumerate() {
         let at = i as u32;
         match instr {
-            Instr::Br(t) | Instr::BrFalse(t) | Instr::BrTrue(t)
-                if (*t as usize) >= n =>
-            {
+            Instr::Br(t) | Instr::BrFalse(t) | Instr::BrTrue(t) if (*t as usize) >= n => {
                 return Err(VerifierError::BranchTargetOutOfBounds {
                     at,
                     target: *t,
@@ -149,7 +160,10 @@ pub fn verify(decision: CompiledDecision) -> Result<VerifiedDecision, VerifierEr
             }
             Instr::Br(_) | Instr::BrFalse(_) | Instr::BrTrue(_) => {}
             Instr::LoadField(f) if f.0 >= decision.input_schema.len() => {
-                return Err(VerifierError::UnknownLoadFieldId { at, field: f.0 as u32 });
+                return Err(VerifierError::UnknownLoadFieldId {
+                    at,
+                    field: f.0 as u32,
+                });
             }
             Instr::LoadField(_) => {}
             Instr::StoreOutputTos(f) if f.0 as usize >= decision.output_schema.len() => {
@@ -242,12 +256,16 @@ fn compute_reachable(instrs: &[Instr]) -> BTreeSet<u32> {
         let idx = pc as usize;
         match &instrs[idx] {
             Instr::EndDecision => {}
-            Instr::Br(t) => { worklist.push(*t); }
+            Instr::Br(t) => {
+                worklist.push(*t);
+            }
             Instr::BrFalse(t) | Instr::BrTrue(t) => {
                 worklist.push(*t);
                 worklist.push(pc + 1);
             }
-            _ => { worklist.push(pc + 1); }
+            _ => {
+                worklist.push(pc + 1);
+            }
         }
     }
     reachable
@@ -277,7 +295,11 @@ fn verify_stack_heights(
         match delta {
             StackDelta::Fixed { pop, push } => {
                 if h < pop {
-                    return Err(VerifierError::StackUnderflow { at, expected: pop, actual: h });
+                    return Err(VerifierError::StackUnderflow {
+                        at,
+                        expected: pop,
+                        actual: h,
+                    });
                 }
                 let new_h = h - pop + push;
                 let next = idx + 1;
@@ -314,7 +336,10 @@ fn set_height(
         return Ok(());
     }
     match heights[idx] {
-        None => { heights[idx] = Some(h); Ok(()) }
+        None => {
+            heights[idx] = Some(h);
+            Ok(())
+        }
         Some(existing) if existing == h => Ok(()),
         Some(existing) => Err(VerifierError::StackJoinMismatch {
             at,
@@ -330,27 +355,27 @@ enum StackDelta {
 fn stack_delta(instr: &Instr) -> StackDelta {
     use StackDelta::Fixed;
     match instr {
-        Instr::LoadField(_)        => Fixed { pop: 0, push: 1 },
-        Instr::PushConst(_)        => Fixed { pop: 0, push: 1 },
-        Instr::PushConstSet(_)     => Fixed { pop: 0, push: 1 },
-        Instr::Pop                 => Fixed { pop: 1, push: 0 },
-        Instr::Dup                 => Fixed { pop: 0, push: 1 },
-        Instr::Eq | Instr::NotEq
-        | Instr::Lt | Instr::Le
-        | Instr::Gt | Instr::Ge    => Fixed { pop: 2, push: 1 },
-        Instr::InSet               => Fixed { pop: 2, push: 1 },
-        Instr::RangeCheck(_)       => Fixed { pop: 1, push: 1 },
+        Instr::LoadField(_) => Fixed { pop: 0, push: 1 },
+        Instr::PushConst(_) => Fixed { pop: 0, push: 1 },
+        Instr::PushConstSet(_) => Fixed { pop: 0, push: 1 },
+        Instr::Pop => Fixed { pop: 1, push: 0 },
+        Instr::Dup => Fixed { pop: 0, push: 1 },
+        Instr::Eq | Instr::NotEq | Instr::Lt | Instr::Le | Instr::Gt | Instr::Ge => {
+            Fixed { pop: 2, push: 1 }
+        }
+        Instr::InSet => Fixed { pop: 2, push: 1 },
+        Instr::RangeCheck(_) => Fixed { pop: 1, push: 1 },
         Instr::IsNull | Instr::IsNotNull => Fixed { pop: 1, push: 1 },
-        Instr::And | Instr::Or     => Fixed { pop: 2, push: 1 },
-        Instr::Not                 => Fixed { pop: 1, push: 1 },
-        Instr::Br(_)               => Fixed { pop: 0, push: 0 },
+        Instr::And | Instr::Or => Fixed { pop: 2, push: 1 },
+        Instr::Not => Fixed { pop: 1, push: 1 },
+        Instr::Br(_) => Fixed { pop: 0, push: 0 },
         Instr::BrFalse(_) | Instr::BrTrue(_) => Fixed { pop: 1, push: 0 },
-        Instr::RuleMatched(_)      => Fixed { pop: 0, push: 0 },
-        Instr::StoreOutputTos(_)   => Fixed { pop: 1, push: 0 },
-        Instr::StoreOutput(_, _)   => Fixed { pop: 0, push: 0 },
-        Instr::EndDecision         => Fixed { pop: 0, push: 0 },
+        Instr::RuleMatched(_) => Fixed { pop: 0, push: 0 },
+        Instr::StoreOutputTos(_) => Fixed { pop: 1, push: 0 },
+        Instr::StoreOutput(_, _) => Fixed { pop: 0, push: 0 },
+        Instr::EndDecision => Fixed { pop: 0, push: 0 },
         // Reserved — should not reach here (rejected above).
-        _                          => Fixed { pop: 0, push: 0 },
+        _ => Fixed { pop: 0, push: 0 },
     }
 }
 

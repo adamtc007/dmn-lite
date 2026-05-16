@@ -67,7 +67,7 @@ fn comments_stripped_before_hash() {
 #[test]
 fn extra_whitespace_collapsed_before_hash() {
     let compact = "(define-decision t :hit-policy first :inputs ((x :type integer :domain N)) :outputs ((y :type integer :domain N)) :rules ((rule r001 :when ((x = 1)) :then ((y = 1)))))";
-    let spaced  = "(define-decision t   :hit-policy  first \n  :inputs ((x  :type  integer  :domain  N))  :outputs  ((y  :type  integer  :domain  N))  :rules  ((rule  r001  :when  ((x = 1))  :then  ((y = 1)))))";
+    let spaced = "(define-decision t   :hit-policy  first \n  :inputs ((x  :type  integer  :domain  N))  :outputs  ((y  :type  integer  :domain  N))  :rules  ((rule  r001  :when  ((x = 1))  :then  ((y = 1)))))";
     assert_eq!(hash_of(compact), hash_of(spaced));
 }
 

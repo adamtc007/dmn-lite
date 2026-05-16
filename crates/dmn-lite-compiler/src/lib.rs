@@ -110,7 +110,9 @@ pub fn compile(
     if !errs.errors.is_empty() {
         return Err(errs);
     }
-    let typed = errs.partial_decision.expect("no errors → must have typed IR");
+    let typed = errs
+        .partial_decision
+        .expect("no errors → must have typed IR");
     let compiled = emit::emit(typed, source_text);
     Ok(compiled)
 }

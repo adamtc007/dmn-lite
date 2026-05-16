@@ -6,8 +6,8 @@
 use dmn_lite_compiler::{compile, load_catalogue_from_str};
 use dmn_lite_parser::parse;
 use dmn_lite_types::{
-    ir::{HitPolicy, TypedValue},
     instr::Instr,
+    ir::{HitPolicy, TypedValue},
 };
 
 // ── Catalogue helpers ─────────────────────────────────────────────────────────
@@ -70,13 +70,22 @@ fn single_eq_comparison_first_has_load_push_eq_brfalse() {
     let cd = compile_ok(src);
     let instrs = &cd.instructions;
     // r001 starts at 0: LoadField, PushConst, Eq, BrFalse
-    assert!(matches!(instrs[0], Instr::LoadField(f) if f.0 == 0), "LoadField(0)");
+    assert!(
+        matches!(instrs[0], Instr::LoadField(f) if f.0 == 0),
+        "LoadField(0)"
+    );
     assert!(matches!(instrs[1], Instr::PushConst(_)), "PushConst");
     assert!(matches!(instrs[2], Instr::Eq), "Eq");
     assert!(matches!(instrs[3], Instr::BrFalse(_)), "BrFalse");
     // RuleMatched(0) followed by Br for FIRST
-    let rm_pos = instrs.iter().position(|i| matches!(i, Instr::RuleMatched(r) if r.0 == 0)).unwrap();
-    assert!(matches!(instrs[rm_pos + 1], Instr::Br(_)), "Br after RuleMatched for FIRST");
+    let rm_pos = instrs
+        .iter()
+        .position(|i| matches!(i, Instr::RuleMatched(r) if r.0 == 0))
+        .unwrap();
+    assert!(
+        matches!(instrs[rm_pos + 1], Instr::Br(_)),
+        "Br after RuleMatched for FIRST"
+    );
 }
 
 /// `<` comparison emits `Lt` instruction.
@@ -127,9 +136,18 @@ fn in_set_emits_load_push_set_in_set() {
     let src = one_rule_first("(x in (1 2 3))", 1);
     let cd = compile_ok(&src);
     let instrs = &cd.instructions;
-    let pos_lf  = instrs.iter().position(|i| matches!(i, Instr::LoadField(_))).unwrap();
-    let pos_pcs = instrs.iter().position(|i| matches!(i, Instr::PushConstSet(_))).unwrap();
-    let pos_ins = instrs.iter().position(|i| matches!(i, Instr::InSet)).unwrap();
+    let pos_lf = instrs
+        .iter()
+        .position(|i| matches!(i, Instr::LoadField(_)))
+        .unwrap();
+    let pos_pcs = instrs
+        .iter()
+        .position(|i| matches!(i, Instr::PushConstSet(_)))
+        .unwrap();
+    let pos_ins = instrs
+        .iter()
+        .position(|i| matches!(i, Instr::InSet))
+        .unwrap();
     assert!(pos_lf < pos_pcs && pos_pcs < pos_ins);
     assert_eq!(cd.const_set_pool.len(), 1);
     assert_eq!(cd.const_set_pool[0].len(), 3);
@@ -143,8 +161,14 @@ fn range_emits_load_range_check_with_bounds() {
     let src = one_rule_first("(x in [1 .. 100])", 1);
     let cd = compile_ok(&src);
     let instrs = &cd.instructions;
-    let pos_lf = instrs.iter().position(|i| matches!(i, Instr::LoadField(_))).unwrap();
-    let pos_rc = instrs.iter().position(|i| matches!(i, Instr::RangeCheck(_))).unwrap();
+    let pos_lf = instrs
+        .iter()
+        .position(|i| matches!(i, Instr::LoadField(_)))
+        .unwrap();
+    let pos_rc = instrs
+        .iter()
+        .position(|i| matches!(i, Instr::RangeCheck(_)))
+        .unwrap();
     assert!(pos_lf < pos_rc);
     assert_eq!(cd.range_pool.len(), 1);
     let r = &cd.range_pool[0];
@@ -166,7 +190,11 @@ fn is_null_emits_is_null() {
 fn is_not_null_emits_is_not_null() {
     let src = one_rule_first("(x is-not-null)", 1);
     let cd = compile_ok(&src);
-    assert!(cd.instructions.iter().any(|i| matches!(i, Instr::IsNotNull)));
+    assert!(
+        cd.instructions
+            .iter()
+            .any(|i| matches!(i, Instr::IsNotNull))
+    );
 }
 
 // ── §6.5 Not predicate ────────────────────────────────────────────────────────
@@ -176,7 +204,7 @@ fn not_predicate_emits_inner_then_not() {
     let src = one_rule_first("(not (x = 5))", 1);
     let cd = compile_ok(&src);
     let instrs = &cd.instructions;
-    let pos_eq  = instrs.iter().position(|i| matches!(i, Instr::Eq)).unwrap();
+    let pos_eq = instrs.iter().position(|i| matches!(i, Instr::Eq)).unwrap();
     let pos_not = instrs.iter().position(|i| matches!(i, Instr::Not)).unwrap();
     assert!(pos_eq < pos_not);
 }
@@ -193,7 +221,11 @@ fn catch_all_has_no_predicate_instructions() {
     let cd = compile_ok(src);
     let instrs = &cd.instructions;
     assert!(!instrs.iter().any(|i| matches!(i, Instr::LoadField(_))));
-    assert!(!instrs.iter().any(|i| matches!(i, Instr::Eq | Instr::InSet | Instr::RangeCheck(_))));
+    assert!(
+        !instrs
+            .iter()
+            .any(|i| matches!(i, Instr::Eq | Instr::InSet | Instr::RangeCheck(_)))
+    );
     assert!(instrs.iter().any(|i| matches!(i, Instr::RuleMatched(_))));
 }
 
@@ -231,7 +263,10 @@ fn unique_policy_no_br_after_rule_matched() {
     let instrs = &cd.instructions;
     for (i, instr) in instrs.iter().enumerate() {
         if matches!(instr, Instr::RuleMatched(_)) {
-            assert!(!matches!(instrs[i + 1], Instr::Br(_)), "UNIQUE has Br at {i}+1");
+            assert!(
+                !matches!(instrs[i + 1], Instr::Br(_)),
+                "UNIQUE has Br at {i}+1"
+            );
         }
     }
 }
@@ -273,7 +308,10 @@ fn end_decision_is_last_instruction() {
         :rules   ((rule r001 :when ((x = 1)) :then ((y = 1)))
                   (rule r999 :when (*) :then ((y = 0)))))"#;
     let cd = compile_ok(src);
-    assert!(matches!(cd.instructions.last().unwrap(), Instr::EndDecision));
+    assert!(matches!(
+        cd.instructions.last().unwrap(),
+        Instr::EndDecision
+    ));
 }
 
 // ── Rule map ──────────────────────────────────────────────────────────────────
@@ -318,13 +356,21 @@ fn two_rule_first_brfalse_targets_next_rule() {
     let instrs = &cd.instructions;
     let r002_entry = cd.rule_map[1].entry_addr;
     // First BrFalse in the stream belongs to r001.
-    let r001_brfalse_target = instrs.iter()
-        .find_map(|i| if let Instr::BrFalse(t) = i { Some(*t) } else { None })
+    let r001_brfalse_target = instrs
+        .iter()
+        .find_map(|i| {
+            if let Instr::BrFalse(t) = i {
+                Some(*t)
+            } else {
+                None
+            }
+        })
         .expect("r001 must have BrFalse");
     assert_eq!(r001_brfalse_target, r002_entry, "r001 BrFalse → r002");
     // All Br(end) must point to the EndDecision (last instruction).
     let end_addr = (instrs.len() - 1) as u32;
-    let all_br_targets_are_end = instrs.iter()
+    let all_br_targets_are_end = instrs
+        .iter()
         .filter_map(|i| if let Instr::Br(t) = i { Some(*t) } else { None })
         .all(|t| t == end_addr);
     assert!(all_br_targets_are_end, "all Br → EndDecision");

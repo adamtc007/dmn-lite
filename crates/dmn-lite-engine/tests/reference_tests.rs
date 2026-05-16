@@ -1,7 +1,7 @@
 //! Reference evaluator test suite — Phase 1.3 §3.8.
 //! 8 categories, ≥40 tests total.
 
-use dmn_lite_compiler::{compile_to_ir, lower_to_ir_with_warnings, load_catalogue_from_str};
+use dmn_lite_compiler::{compile_to_ir, load_catalogue_from_str, lower_to_ir_with_warnings};
 use dmn_lite_engine::reference::evaluate;
 use dmn_lite_parser::parse;
 use dmn_lite_types::{

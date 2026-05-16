@@ -7,9 +7,8 @@
 use std::time::SystemTime;
 
 use dmn_lite_compiler::{
-    compile_and_verify, load_catalogue_from_str,
+    CompiledDecision, compile_and_verify, load_catalogue_from_str,
     verify::{VerifierError, verify},
-    CompiledDecision,
 };
 use dmn_lite_parser::parse;
 use dmn_lite_types::{
@@ -20,7 +19,9 @@ use dmn_lite_types::{
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn zero_span() -> SourceSpan { SourceSpan { start: 0, end: 0 } }
+fn zero_span() -> SourceSpan {
+    SourceSpan { start: 0, end: 0 }
+}
 
 fn int_field(name: &str, idx: usize) -> FieldSchema {
     FieldSchema {
@@ -203,7 +204,8 @@ fn unknown_const_id() {
 fn unknown_const_set_id() {
     let mut cd = minimal_valid();
     // Inject PushConstSet(0) — but const_set_pool is empty.
-    cd.instructions.insert(1, Instr::PushConstSet(ConstSetId(0)));
+    cd.instructions
+        .insert(1, Instr::PushConstSet(ConstSetId(0)));
     cd.source_spans.insert(1, zero_span());
     assert!(matches!(
         verify(cd),
@@ -265,7 +267,10 @@ fn multiple_end_decisions() {
     // Append a second EndDecision + its span.
     cd.instructions.push(Instr::EndDecision);
     cd.source_spans.push(zero_span());
-    assert!(matches!(verify(cd), Err(VerifierError::MultipleEndDecisions)));
+    assert!(matches!(
+        verify(cd),
+        Err(VerifierError::MultipleEndDecisions)
+    ));
 }
 
 // ── VerifierError::UnreachableEndDecision ────────────────────────────────────
@@ -292,7 +297,10 @@ fn unreachable_end_decision() {
         compile_context: stub_compile_context(),
         typed_ir: stub_typed_ir(),
     };
-    assert!(matches!(verify(cd), Err(VerifierError::UnreachableEndDecision)));
+    assert!(matches!(
+        verify(cd),
+        Err(VerifierError::UnreachableEndDecision)
+    ));
 }
 
 // ── VerifierError::DanglingInstruction ───────────────────────────────────────
@@ -303,11 +311,11 @@ fn dangling_instruction() {
     // Position 4 is reachable via branch, not EndDecision, not Br,
     // and idx+1=5 >= n=5 → DanglingInstruction.
     let instrs = vec![
-        Instr::LoadField(FieldId(0)),   // 0: h=0→1
-        Instr::IsNotNull,               // 1: h=1→1 (bool)
-        Instr::BrFalse(4),              // 2: pop bool (h=1→0); fall→3 (h=0), branch→4 (h=0)
-        Instr::EndDecision,             // 3: h=0 ✓ reachable via fall-through
-        Instr::LoadField(FieldId(0)),   // 4: reachable via branch; idx=4=n-1 → DanglingInstruction
+        Instr::LoadField(FieldId(0)), // 0: h=0→1
+        Instr::IsNotNull,             // 1: h=1→1 (bool)
+        Instr::BrFalse(4),            // 2: pop bool (h=1→0); fall→3 (h=0), branch→4 (h=0)
+        Instr::EndDecision,           // 3: h=0 ✓ reachable via fall-through
+        Instr::LoadField(FieldId(0)), // 4: reachable via branch; idx=4=n-1 → DanglingInstruction
     ];
     let n = instrs.len();
     let cd = CompiledDecision {
@@ -326,7 +334,10 @@ fn dangling_instruction() {
         compile_context: stub_compile_context(),
         typed_ir: stub_typed_ir(),
     };
-    assert!(matches!(verify(cd), Err(VerifierError::DanglingInstruction { .. })));
+    assert!(matches!(
+        verify(cd),
+        Err(VerifierError::DanglingInstruction { .. })
+    ));
 }
 
 // ── VerifierError::StackUnderflow ─────────────────────────────────────────────
@@ -352,7 +363,10 @@ fn stack_underflow() {
         compile_context: stub_compile_context(),
         typed_ir: stub_typed_ir(),
     };
-    assert!(matches!(verify(cd), Err(VerifierError::StackUnderflow { .. })));
+    assert!(matches!(
+        verify(cd),
+        Err(VerifierError::StackUnderflow { .. })
+    ));
 }
 
 // ── VerifierError::StackJoinMismatch ─────────────────────────────────────────
@@ -372,12 +386,12 @@ fn stack_join_mismatch() {
     //    Br(5)            h=0 → 5 (h=0) — conflict with h=2 at 5 → StackJoinMismatch
     // 5: EndDecision
     let instrs = vec![
-        Instr::PushConst(ConstId(0)),   // 0
-        Instr::BrFalse(4),              // 1: fall→2, branch→4
-        Instr::PushConst(ConstId(0)),   // 2
-        Instr::Br(5),                   // 3: jump to 5 with h=2
-        Instr::Br(5),                   // 4: jump to 5 with h=0
-        Instr::EndDecision,             // 5: receives h=2 AND h=0 → mismatch
+        Instr::PushConst(ConstId(0)), // 0
+        Instr::BrFalse(4),            // 1: fall→2, branch→4
+        Instr::PushConst(ConstId(0)), // 2
+        Instr::Br(5),                 // 3: jump to 5 with h=2
+        Instr::Br(5),                 // 4: jump to 5 with h=0
+        Instr::EndDecision,           // 5: receives h=2 AND h=0 → mismatch
     ];
     let n = instrs.len();
     let cd = CompiledDecision {
@@ -396,7 +410,10 @@ fn stack_join_mismatch() {
         compile_context: stub_compile_context(),
         typed_ir: stub_typed_ir(),
     };
-    assert!(matches!(verify(cd), Err(VerifierError::StackJoinMismatch { .. })));
+    assert!(matches!(
+        verify(cd),
+        Err(VerifierError::StackJoinMismatch { .. })
+    ));
 }
 
 // ── VerifierError::NonZeroStackAtEnd ─────────────────────────────────────────
@@ -422,7 +439,10 @@ fn non_zero_stack_at_end() {
         compile_context: stub_compile_context(),
         typed_ir: stub_typed_ir(),
     };
-    assert!(matches!(verify(cd), Err(VerifierError::NonZeroStackAtEnd { height: 1, .. })));
+    assert!(matches!(
+        verify(cd),
+        Err(VerifierError::NonZeroStackAtEnd { height: 1, .. })
+    ));
 }
 
 // ── VerifierError::HitPolicyShapeMismatch ────────────────────────────────────
