@@ -19,7 +19,10 @@ description = "FFI execution owner for dmn-lite — registers compiled decisions
 [dependencies]
 dmn-lite-types = { path = "../dmn-lite-types" }
 dmn-lite-engine = { path = "../dmn-lite-engine" }
-# ffi-types lives in the bpmn-lite workspace; cross-workspace path dep.
+# ffi-types cross-repo dep.
+# Local monorepo: path dep works when both repos are checked out under ob-poc/.
+# Standalone CI: publish ffi-types to crates.io or configure Cargo SSH auth
+# to use: ffi-types = { git = "https://github.com/adamtc007/bpmn-lite", branch = "main" }
 ffi-types = { path = "../../../bpmn-lite/ffi-types" }
 async-trait = "0.1"
 anyhow = "1"
