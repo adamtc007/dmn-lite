@@ -1,0 +1,13 @@
+[package]
+name = "dmn-lite-compiler"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "dmn-lite compiler: AST to typed predicate IR to bytecode"
+
+[dependencies]
+dmn-lite-types = { path = "../dmn-lite-types" }
+dmn-lite-parser = { path = "../dmn-lite-parser" }

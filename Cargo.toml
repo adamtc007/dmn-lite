@@ -1,0 +1,25 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/dmn-lite-types",
+    "crates/dmn-lite-parser",
+    "crates/dmn-lite-compiler",
+    "crates/dmn-lite-analysis",
+    "crates/dmn-lite-engine",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+authors = ["Adam Cearns <adamtc007@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/adamtc007/ob-poc"
+description = "dmn-lite: Rust-native static DMN compiler and stack-VM runtime"
+
+[workspace.dependencies]
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v7", "serde"] }
+smallvec = { version = "1", features = ["serde"] }
