@@ -149,9 +149,14 @@ fn step(
             state.push(TypedValue::Integer(sid.0 as i64));
             state.pc += 1;
         }
-        Instr::Pop => { state.pop(); state.pc += 1; }
+        Instr::Pop => {
+            state.pop();
+            state.pc += 1;
+        }
         Instr::Dup => {
-            if let Some(v) = state.peek().cloned() { state.push(v); }
+            if let Some(v) = state.peek().cloned() {
+                state.push(v);
+            }
             state.pc += 1;
         }
         Instr::Eq => {
@@ -163,8 +168,14 @@ fn step(
         Instr::NotEq => {
             let b = state.pop().unwrap_or(TypedValue::Null);
             let a = state.pop().unwrap_or(TypedValue::Null);
-            let eq = values_equal(&a, &b);
-            state.push(TypedValue::Bool(!eq));
+            // Two-valued null semantics (semantics.md §3.2): null on either side → false.
+            // NotEq is NOT simply !Eq — both return false when null is involved.
+            let result = if matches!(a, TypedValue::Null) || matches!(b, TypedValue::Null) {
+                false
+            } else {
+                !values_equal(&a, &b)
+            };
+            state.push(TypedValue::Bool(result));
             state.pc += 1;
         }
         Instr::Lt => {
@@ -240,7 +251,9 @@ fn step(
             state.push(TypedValue::Bool(!as_bool(&v)));
             state.pc += 1;
         }
-        Instr::Br(addr) => { state.pc = *addr; }
+        Instr::Br(addr) => {
+            state.pc = *addr;
+        }
         Instr::BrFalse(addr) => {
             let v = state.pop().unwrap_or(TypedValue::Bool(false));
             let is_false = !as_bool(&v);
@@ -282,7 +295,9 @@ fn step(
             state.halted = true;
         }
         // Reserved — verifier guarantees these never appear.
-        _ => { state.pc += 1; }
+        _ => {
+            state.pc += 1;
+        }
     }
     Ok(())
 }
@@ -308,7 +323,11 @@ fn record_predicate_trace(state: &mut VmState, result: bool, span: SourceSpan) {
         .get(span.start as usize..span.end as usize)
         .unwrap_or("")
         .to_owned();
-    state.current_rule_predicates.push(PredicateTrace { result, source_span: span, description });
+    state.current_rule_predicates.push(PredicateTrace {
+        result,
+        source_span: span,
+        description,
+    });
 }
 
 /// Finalise the trace for a rule that did NOT match (BrFalse jumped away).
@@ -385,8 +404,14 @@ fn finalize(state: VmState, compiled: &CompiledDecision) -> Result<EvaluationOut
     let outcome = match state.hit_policy {
         HitPolicy::Unique => match state.matched_rules.len() {
             0 => return Err(EvalError::NoMatch),
-            1 => TraceOutcome::Match { rule_id: state.matched_rules[0] },
-            _ => return Err(EvalError::MultipleMatches { rules: state.matched_rules.clone() }),
+            1 => TraceOutcome::Match {
+                rule_id: state.matched_rules[0],
+            },
+            _ => {
+                return Err(EvalError::MultipleMatches {
+                    rules: state.matched_rules.clone(),
+                });
+            }
         },
         HitPolicy::First => match state.matched_rules.first() {
             None => return Err(EvalError::NoMatch),
@@ -402,7 +427,10 @@ fn finalize(state: VmState, compiled: &CompiledDecision) -> Result<EvaluationOut
         .collect();
     let output = TypedOutputContext::from_slots(&compiled.output_schema, slots);
 
-    let trace = EvaluationTrace { rules: traces, outcome };
+    let trace = EvaluationTrace {
+        rules: traces,
+        outcome,
+    };
     Ok(EvaluationOutput { output, trace })
 }
 
