@@ -10,6 +10,7 @@ description = "dmn-lite engine: stack VM and reference evaluator over compiled d
 
 [dependencies]
 dmn-lite-types = { path = "../dmn-lite-types" }
+smallvec = { workspace = true }
 
 [dev-dependencies]
 dmn-lite-compiler = { path = "../dmn-lite-compiler" }

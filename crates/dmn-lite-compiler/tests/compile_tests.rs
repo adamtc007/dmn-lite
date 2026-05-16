@@ -2,7 +2,7 @@
 //! Happy-path, field resolution, type checking, structural, warnings,
 //! determinism, and multi-error tests.
 
-use dmn_lite_compiler::{CompileError, compile, compile_with_warnings, load_catalogue_from_str};
+use dmn_lite_compiler::{CompileError, compile_to_ir, lower_to_ir_with_warnings, load_catalogue_from_str};
 use dmn_lite_parser::parse;
 use dmn_lite_types::{
     CompileWarning as W,
@@ -50,7 +50,7 @@ fn has_error<F: Fn(&CompileError) -> bool>(
     cat: &dmn_lite_compiler::Catalogue,
     f: F,
 ) -> bool {
-    let errs = compile_with_warnings(parse_ok(src), cat);
+    let errs = lower_to_ir_with_warnings(parse_ok(src), cat);
     errs.errors.iter().any(f)
 }
 
@@ -60,7 +60,7 @@ fn has_error<F: Fn(&CompileError) -> bool>(
 fn test_compile_ebnf_51_booking_eligibility() {
     let src = include_str!("../../dmn-lite-parser/tests/fixtures/booking_eligibility.dmn-lite");
     let cat = stub_cat();
-    let decision = compile(parse_ok(src), &cat).expect("§5.1 must compile");
+    let decision = compile_to_ir(parse_ok(src), &cat).expect("§5.1 must compile");
     assert_eq!(decision.name, "booking-eligibility");
     assert!(matches!(decision.hit_policy, HitPolicy::First));
     assert_eq!(decision.input_schema.len(), 5);
@@ -74,7 +74,7 @@ fn test_compile_ebnf_51_booking_eligibility() {
 fn test_compile_ebnf_52_age_band() {
     let src = include_str!("../../dmn-lite-parser/tests/fixtures/age_band.dmn-lite");
     let cat = stub_cat();
-    let res = compile_with_warnings(parse_ok(src), &cat);
+    let res = lower_to_ir_with_warnings(parse_ok(src), &cat);
     // integer and enum fields → DomainOnNonEnum warning for AgeYears
     assert!(res.errors.is_empty(), "§5.2 must compile: {:?}", res.errors);
     let d = res.partial_decision.unwrap();
@@ -93,7 +93,7 @@ fn test_compile_ebnf_52_age_band() {
 fn test_compile_ebnf_53_kyc_status() {
     let src = include_str!("../../dmn-lite-parser/tests/fixtures/kyc_status.dmn-lite");
     let cat = stub_cat();
-    let res = compile_with_warnings(parse_ok(src), &cat);
+    let res = lower_to_ir_with_warnings(parse_ok(src), &cat);
     assert!(res.errors.is_empty(), "§5.3 must compile: {:?}", res.errors);
     let d = res.partial_decision.unwrap();
     assert_eq!(d.name, "kyc-status");
@@ -108,7 +108,7 @@ fn test_compile_resolved_entities_in_source_order() {
       :rules   ((rule r1 :when ((x = A)) :then ((y = OK)))
                 (rule r2 :when ((x = B)) :then ((y = OK)))))"#;
     let cat = mini_cat(&format!("{}\n{}", enum_domain_ab(), ok_domain_r()));
-    let d = compile(parse_ok(src), &cat).unwrap();
+    let d = compile_to_ir(parse_ok(src), &cat).unwrap();
     // Source order: r1 pred (A), r1 assign (OK), r2 pred (B), r2 assign (OK)
     assert_eq!(d.resolved_entities.len(), 4);
     // First entity is A, second is OK, third is B, fourth is OK
@@ -124,7 +124,7 @@ fn test_decision_id_from_decision_id_attr() {
       :outputs ((y :type enum :domain R))
       :rules   ((rule r1 :when (*) :then ((y = OK)))))"#;
     let cat = mini_cat(&format!("{}\n{}", enum_domain_ab(), ok_domain_r()));
-    let d = compile(parse_ok(src), &cat).unwrap();
+    let d = compile_to_ir(parse_ok(src), &cat).unwrap();
     assert_eq!(d.decision_id.to_string(), "custom.id.v1");
 }
 
@@ -165,7 +165,7 @@ fn test_field_resolves_to_correct_id() {
       :outputs ((y :type enum :domain R))
       :rules   ((rule r1 :when (*) :then ((y = OK)))))"#;
     let cat = mini_cat(&format!("{}\n{}", enum_domain_ab(), ok_domain_r()));
-    let d = compile(parse_ok(src), &cat).unwrap();
+    let d = compile_to_ir(parse_ok(src), &cat).unwrap();
     assert_eq!(d.input_schema[0].field_id.0, 0);
     assert_eq!(d.input_schema[0].name, "first");
     assert_eq!(d.input_schema[1].field_id.0, 1);
@@ -251,7 +251,7 @@ fn test_enum_literal_compiles_to_typed_value() {
       :outputs ((y :type enum :domain R))
       :rules   ((rule r1 :when ((x = A)) :then ((y = OK)))))"#;
     let cat = mini_cat(&format!("{}\n{}", enum_domain_ab(), ok_domain_r()));
-    let d = compile(parse_ok(src), &cat).unwrap();
+    let d = compile_to_ir(parse_ok(src), &cat).unwrap();
     if let TypedWhen::Predicates(preds, _) = &d.rules[0].when {
         assert!(matches!(
             &preds[0],
@@ -371,7 +371,7 @@ fn test_integer_widens_to_decimal() {
       :outputs ((y :type enum :domain R))
       :rules   ((rule r1 :when ((n = 42)) :then ((y = OK)))))"#;
     let cat = mini_cat(&format!("{}\n{}", int_domain(), ok_domain_r()));
-    let d = compile(parse_ok(src), &cat).unwrap();
+    let d = compile_to_ir(parse_ok(src), &cat).unwrap();
     if let TypedWhen::Predicates(preds, _) = &d.rules[0].when {
         assert!(
             matches!(&preds[0], TypedPredicate::Comparison { rhs: TypedValue::Decimal(v), .. } if *v == 42.0)
@@ -479,7 +479,7 @@ fn test_first_policy_catch_all_as_last_rule_ok() {
       :rules   ((rule r1 :when ((x = A)) :then ((y = OK)))
                 (rule r2 :when (*) :then ((y = OK)))))"#;
     let cat = mini_cat(&format!("{}\n{}", enum_domain_ab(), ok_domain_r()));
-    let d = compile(parse_ok(src), &cat).expect("FIRST with catch-all last must compile");
+    let d = compile_to_ir(parse_ok(src), &cat).expect("FIRST with catch-all last must compile");
     assert!(matches!(d.hit_policy, HitPolicy::First));
 }
 
@@ -505,7 +505,7 @@ fn test_catch_all_only_decision_compiles() {
       :outputs ((y :type enum :domain R))
       :rules   ((rule r1 :when (*) :then ((y = OK)))))"#;
     let cat = mini_cat(&format!("{}\n{}", enum_domain_ab(), ok_domain_r()));
-    let d = compile(parse_ok(src), &cat).expect("catch-all only must compile");
+    let d = compile_to_ir(parse_ok(src), &cat).expect("catch-all only must compile");
     assert!(matches!(d.rules[0].when, TypedWhen::CatchAll(_)));
 }
 
@@ -520,7 +520,7 @@ fn test_multiple_independent_errors_reported() {
       :rules   ((rule r1 :when ((nosuch1 = A)) :then ((y = OK)))
                 (rule r2 :when ((nosuch2 = A)) :then ((y = OK)))))"#;
     let cat = mini_cat(&format!("{}\n{}", enum_domain_ab(), ok_domain_r()));
-    let errs = compile_with_warnings(parse_ok(src), &cat);
+    let errs = lower_to_ir_with_warnings(parse_ok(src), &cat);
     assert!(
         errs.errors.len() >= 2,
         "expected >= 2 errors, got {:?}",
@@ -536,7 +536,7 @@ fn test_partial_decision_when_schemas_resolve() {
       :outputs ((y :type enum :domain R))
       :rules   ((rule r1 :when ((badfield = A)) :then ((y = OK)))))"#;
     let cat = mini_cat(&format!("{}\n{}", enum_domain_ab(), ok_domain_r()));
-    let errs = compile_with_warnings(parse_ok(src), &cat);
+    let errs = lower_to_ir_with_warnings(parse_ok(src), &cat);
     assert!(!errs.errors.is_empty());
     assert!(
         errs.partial_decision.is_some(),
@@ -552,7 +552,7 @@ fn test_partial_decision_none_when_schema_fails() {
       :outputs ((y :type enum :domain R))
       :rules   ((rule r1 :when (*) :then ((y = OK)))))"#;
     let cat = mini_cat(&ok_domain_r());
-    let errs = compile_with_warnings(parse_ok(src), &cat);
+    let errs = lower_to_ir_with_warnings(parse_ok(src), &cat);
     assert!(!errs.errors.is_empty());
     assert!(
         errs.partial_decision.is_none(),
@@ -569,7 +569,7 @@ fn test_non_enum_domain_produces_warning() {
       :outputs ((y :type enum :domain R))
       :rules   ((rule r1 :when (*) :then ((y = OK)))))"#;
     let cat = mini_cat(&format!("{}\n{}", int_domain(), ok_domain_r()));
-    let res = compile_with_warnings(parse_ok(src), &cat);
+    let res = lower_to_ir_with_warnings(parse_ok(src), &cat);
     assert!(
         res.errors.is_empty(),
         "non-enum domain must not be an error"
@@ -588,7 +588,7 @@ fn test_compile_succeeds_with_domain_warning() {
       :outputs ((y :type enum :domain R))
       :rules   ((rule r1 :when (*) :then ((y = OK)))))"#;
     let cat = mini_cat(&format!("{}\n{}", int_domain(), ok_domain_r()));
-    let d = compile(parse_ok(src), &cat).expect("compilation with warnings must succeed");
+    let d = compile_to_ir(parse_ok(src), &cat).expect("compilation with warnings must succeed");
     assert!(matches!(
         d.input_schema[0].field_type,
         dmn_lite_types::ir::ResolvedType::Integer
@@ -602,7 +602,7 @@ fn test_domain_warning_span_points_at_domain_clause() {
       :outputs ((y :type enum :domain R))
       :rules   ((rule r1 :when (*) :then ((y = OK)))))"#;
     let cat = mini_cat(&format!("{}\n{}", int_domain(), ok_domain_r()));
-    let res = compile_with_warnings(parse_ok(src), &cat);
+    let res = lower_to_ir_with_warnings(parse_ok(src), &cat);
     let w = res
         .warnings
         .iter()
@@ -621,8 +621,8 @@ fn test_domain_warning_span_points_at_domain_clause() {
 fn test_compile_is_deterministic() {
     let src = include_str!("../../dmn-lite-parser/tests/fixtures/booking_eligibility.dmn-lite");
     let cat = stub_cat();
-    let d1 = compile(parse_ok(src), &cat).unwrap();
-    let d2 = compile(parse_ok(src), &cat).unwrap();
+    let d1 = compile_to_ir(parse_ok(src), &cat).unwrap();
+    let d2 = compile_to_ir(parse_ok(src), &cat).unwrap();
     assert_eq!(
         d1, d2,
         "two compiles of the same source must produce identical TypedDecision"
@@ -638,7 +638,7 @@ fn test_resolved_entities_in_source_order() {
       :rules   ((rule r1 :when ((x = A)) :then ((y = OK)))
                 (rule r2 :when ((x = B)) :then ((y = OK)))))"#;
     let cat = mini_cat(&format!("{}\n{}", enum_domain_ab(), ok_domain_r()));
-    let d = compile(parse_ok(src), &cat).unwrap();
+    let d = compile_to_ir(parse_ok(src), &cat).unwrap();
     // entity 0: A (r1 pred), entity 1: OK (r1 assign), entity 2: B (r2 pred), entity 3: OK (r2 assign)
     let ids: Vec<String> = d
         .resolved_entities

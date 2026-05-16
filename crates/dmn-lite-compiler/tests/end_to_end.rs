@@ -1,10 +1,11 @@
-//! Vertical-slice end-to-end test — Phase 1.3 §3.9.
+//! Vertical-slice end-to-end tests — Phase 1.3 §3.9 + Phase 1.4 VM e2e.
 //!
 //! Proves that source → AST → typed IR → evaluation → output composes
 //! correctly across all three crates: parser, compiler, engine.
+//! Phase 1.4 adds one VM path test: compile_and_verify → vm::evaluate.
 
-use dmn_lite_compiler::{compile, compile_with_warnings, load_catalogue_from_str};
-use dmn_lite_engine::reference::evaluate;
+use dmn_lite_compiler::{compile_to_ir, compile_and_verify, lower_to_ir_with_warnings, load_catalogue_from_str};
+use dmn_lite_engine::{reference::evaluate, vm};
 use dmn_lite_parser::parse;
 use dmn_lite_types::{RuleId, TraceOutcome, ir::TypedValue, values::TypedInputContextBuilder};
 
@@ -28,7 +29,7 @@ fn enum_val(cat: &dmn_lite_compiler::Catalogue, domain: &str, sym: &str) -> Type
 fn vertical_slice_booking_eligibility_r001_match() {
     let ast = parse(BOOKING_SRC).expect("source should parse");
     let catalogue = load_catalogue_from_str(STUB).expect("catalogue must load");
-    let decision = compile(ast, &catalogue).expect("source should compile");
+    let decision = compile_to_ir(ast, &catalogue).expect("source should compile");
 
     assert_eq!(decision.name, "booking-eligibility");
     assert_eq!(decision.input_schema.len(), 5);
@@ -103,7 +104,7 @@ fn vertical_slice_booking_eligibility_r001_match() {
 #[test]
 fn vertical_slice_age_band_first_policy() {
     let catalogue = load_catalogue_from_str(STUB).unwrap();
-    let res = compile_with_warnings(parse(AGE_SRC).unwrap(), &catalogue);
+    let res = lower_to_ir_with_warnings(parse(AGE_SRC).unwrap(), &catalogue);
     assert!(
         res.errors.is_empty(),
         "age_band compile errors: {:?}",
@@ -130,7 +131,7 @@ fn vertical_slice_age_band_first_policy() {
 #[test]
 fn vertical_slice_kyc_status_bool_input() {
     let catalogue = load_catalogue_from_str(STUB).unwrap();
-    let res = compile_with_warnings(parse(KYC_SRC).unwrap(), &catalogue);
+    let res = lower_to_ir_with_warnings(parse(KYC_SRC).unwrap(), &catalogue);
     assert!(
         res.errors.is_empty(),
         "kyc_status compile errors: {:?}",
@@ -152,4 +153,35 @@ fn vertical_slice_kyc_status_bool_input() {
         .get_by_name(&decision.output_schema, "kyc-status")
         .unwrap();
     assert_eq!(status, &enum_val(&catalogue, "KycStatus", "REJECTED"));
+}
+
+/// Phase 1.4 workspace-level e2e VM test:
+/// source → parse → compile_and_verify → vm::evaluate → output.
+///
+/// Proves that the production stack VM executes the booking_eligibility
+/// decision and produces the same output as the reference evaluator.
+#[test]
+fn vm_e2e_booking_eligibility_r001_matches() {
+    let src = BOOKING_SRC;
+    let catalogue = load_catalogue_from_str(STUB).expect("catalogue must load");
+    let verified = compile_and_verify(parse(src).unwrap(), &catalogue, src)
+        .expect("compile_and_verify must succeed");
+    let compiled = verified.as_compiled();
+
+    let mut b = TypedInputContextBuilder::new(&compiled.input_schema);
+    b.set_by_name("jurisdiction", enum_val(&catalogue, "Jurisdiction", "LU")).unwrap();
+    b.set_by_name("client-type", enum_val(&catalogue, "CbuType", "SICAV")).unwrap();
+    b.set_by_name("product", enum_val(&catalogue, "ProductCode", "CUSTODY")).unwrap();
+    b.set_by_name("booking-principal", enum_val(&catalogue, "BookingPrincipal", "BNY_LUX")).unwrap();
+    b.set_by_name("source-of-funds", enum_val(&catalogue, "SourceOfFunds", "SALARY")).unwrap();
+    let ctx = b.build();
+
+    let result = vm::evaluate(&verified, &ctx, src).expect("VM must succeed");
+    // FIRST returns r001 (rule_id = 0).
+    assert_eq!(result.trace.outcome, TraceOutcome::Match { rule_id: RuleId(0) });
+    // Output matches reference evaluator.
+    let eligibility = result.output.get_by_name(&compiled.output_schema, "eligibility").unwrap();
+    assert_eq!(eligibility, &enum_val(&catalogue, "EligibilityOutcome", "ELIGIBLE"));
+    let reason = result.output.get_by_name(&compiled.output_schema, "reason-code").unwrap();
+    assert_eq!(reason, &enum_val(&catalogue, "BookingReasonCode", "STANDARD_LUX_SICAV"));
 }

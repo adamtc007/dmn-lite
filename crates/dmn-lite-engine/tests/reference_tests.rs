@@ -1,7 +1,7 @@
 //! Reference evaluator test suite — Phase 1.3 §3.8.
 //! 8 categories, ≥40 tests total.
 
-use dmn_lite_compiler::{compile, compile_with_warnings, load_catalogue_from_str};
+use dmn_lite_compiler::{compile_to_ir, lower_to_ir_with_warnings, load_catalogue_from_str};
 use dmn_lite_engine::reference::evaluate;
 use dmn_lite_parser::parse;
 use dmn_lite_types::{
@@ -35,7 +35,7 @@ fn enum_ab_cat() -> dmn_lite_compiler::Catalogue {
 }
 
 fn compile_ok(src: &str, c: &dmn_lite_compiler::Catalogue) -> dmn_lite_types::ir::TypedDecision {
-    compile(parse(src).expect("parse"), c).expect("compile")
+    compile_to_ir(parse(src).expect("parse"), c).expect("compile")
 }
 
 fn enum_val(domain_name: &str, sym: &str, c: &dmn_lite_compiler::Catalogue) -> TypedValue {
@@ -149,7 +149,7 @@ fn test_explicit_null_distinguishable_from_missing_at_api_level() {
 fn test_ebnf_51_eligibility_match_r001() {
     let src = include_str!("../../dmn-lite-parser/tests/fixtures/booking_eligibility.dmn-lite");
     let cat = cat();
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
 
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set_by_name("jurisdiction", enum_val("Jurisdiction", "LU", &cat))
@@ -207,7 +207,7 @@ fn test_ebnf_51_eligibility_match_r001() {
 fn test_ebnf_51_eligibility_catchall_r999() {
     let src = include_str!("../../dmn-lite-parser/tests/fixtures/booking_eligibility.dmn-lite");
     let cat = cat();
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
 
     // Input that doesn't match r001 or r002 → hits catch-all r999
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
@@ -243,7 +243,7 @@ fn test_ebnf_51_eligibility_catchall_r999() {
 fn test_ebnf_52_age_band_minor() {
     let src = include_str!("../../dmn-lite-parser/tests/fixtures/age_band.dmn-lite");
     let cat = cat();
-    let res = compile_with_warnings(parse(src).unwrap(), &cat);
+    let res = lower_to_ir_with_warnings(parse(src).unwrap(), &cat);
     let d = res.partial_decision.unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set_by_name("age", TypedValue::Integer(15)).unwrap();
@@ -258,7 +258,7 @@ fn test_ebnf_52_age_band_minor() {
 fn test_ebnf_52_age_band_adult() {
     let src = include_str!("../../dmn-lite-parser/tests/fixtures/age_band.dmn-lite");
     let cat = cat();
-    let d = compile_with_warnings(parse(src).unwrap(), &cat)
+    let d = lower_to_ir_with_warnings(parse(src).unwrap(), &cat)
         .partial_decision
         .unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
@@ -272,7 +272,7 @@ fn test_ebnf_52_age_band_adult() {
 fn test_ebnf_53_kyc_approved() {
     let src = include_str!("../../dmn-lite-parser/tests/fixtures/kyc_status.dmn-lite");
     let cat = cat();
-    let d = compile_with_warnings(parse(src).unwrap(), &cat)
+    let d = lower_to_ir_with_warnings(parse(src).unwrap(), &cat)
         .partial_decision
         .unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
@@ -291,7 +291,7 @@ fn test_ebnf_53_kyc_approved() {
 // ─── Category 3: Predicate kind correctness ───────────────────────────────────
 
 fn eval_matched(src: &str, cat: &dmn_lite_compiler::Catalogue, x: TypedValue) -> bool {
-    let d = compile(parse(src).unwrap(), cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), cat).unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set(FieldId(0), x);
     let out = evaluate(&d, &b.build(), src).expect("eval");
@@ -373,7 +373,7 @@ fn test_le_true_at_boundary() {
 fn test_in_set_true() {
     let cat = enum_ab_cat();
     let src = "(define-decision d :hit-policy first :inputs ((x :type enum :domain AB)) :outputs ((matched :type enum :domain R)) :rules ((rule r1 :when ((x in (A B))) :then ((matched = OK))) (rule r0 :when (*) :then ((matched = OK)))))";
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set_by_name("x", enum_val("AB", "A", &cat)).unwrap();
     let out = evaluate(&d, &b.build(), "").unwrap();
@@ -397,7 +397,7 @@ fn test_range_inclusive_both_ends() {
 fn test_is_null_true_on_null() {
     let cat = mini_cat(int_domain());
     let src = "(define-decision d :hit-policy first :inputs ((x :type integer :domain N)) :outputs ((matched :type integer :domain N)) :rules ((rule r1 :when ((x is-null)) :then ((matched = 1))) (rule r0 :when (*) :then ((matched = 0)))))";
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set_null(FieldId(0));
     let out = evaluate(&d, &b.build(), "").unwrap();
@@ -445,7 +445,7 @@ fn test_or_predicate_any_true() {
 fn test_unique_one_match() {
     let cat = enum_ab_cat();
     let src = "(define-decision d :hit-policy unique :inputs ((x :type enum :domain AB)) :outputs ((y :type enum :domain R)) :rules ((rule r1 :when ((x = A)) :then ((y = OK))) (rule r2 :when ((x = B)) :then ((y = OK)))))";
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set_by_name("x", enum_val("AB", "A", &cat)).unwrap();
     let out = evaluate(&d, &b.build(), "").unwrap();
@@ -459,7 +459,7 @@ fn test_unique_one_match() {
 fn test_unique_no_match() {
     let cat = mini_cat(int_domain());
     let src = "(define-decision d :hit-policy unique :inputs ((x :type integer :domain N)) :outputs ((y :type integer :domain N)) :rules ((rule r1 :when ((x = 99)) :then ((y = 1)))))";
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
     let ctx = TypedInputContextBuilder::new(&d.input_schema).build();
     let err = evaluate(&d, &ctx, "").unwrap_err();
     assert_eq!(err, EvalError::NoMatch);
@@ -470,7 +470,7 @@ fn test_unique_multiple_matches() {
     let cat = mini_cat(int_domain());
     // Two rules both match x > 0; UNIQUE should error
     let src = "(define-decision d :hit-policy unique :inputs ((x :type integer :domain N)) :outputs ((y :type integer :domain N)) :rules ((rule r1 :when ((x > 0)) :then ((y = 1))) (rule r2 :when ((x > 0)) :then ((y = 2)))))";
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set(FieldId(0), TypedValue::Integer(5));
     let err = evaluate(&d, &b.build(), "").unwrap_err();
@@ -483,7 +483,7 @@ fn test_unique_multiple_matches() {
 fn test_first_returns_first_match() {
     let cat = mini_cat(int_domain());
     let src = "(define-decision d :hit-policy first :inputs ((x :type integer :domain N)) :outputs ((y :type integer :domain N)) :rules ((rule r1 :when ((x > 0)) :then ((y = 1))) (rule r2 :when ((x > 0)) :then ((y = 2)))))";
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set(FieldId(0), TypedValue::Integer(5));
     let out = evaluate(&d, &b.build(), "").unwrap();
@@ -498,7 +498,7 @@ fn test_first_returns_first_match() {
 fn test_first_second_rule_only() {
     let cat = mini_cat(int_domain());
     let src = "(define-decision d :hit-policy first :inputs ((x :type integer :domain N)) :outputs ((y :type integer :domain N)) :rules ((rule r1 :when ((x = 99)) :then ((y = 1))) (rule r2 :when ((x > 0)) :then ((y = 2)))))";
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set(FieldId(0), TypedValue::Integer(5));
     let out = evaluate(&d, &b.build(), "").unwrap();
@@ -513,7 +513,7 @@ fn test_first_second_rule_only() {
 fn test_first_no_match() {
     let cat = mini_cat(int_domain());
     let src = "(define-decision d :hit-policy first :inputs ((x :type integer :domain N)) :outputs ((y :type integer :domain N)) :rules ((rule r1 :when ((x = 99)) :then ((y = 1)))))";
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
     let ctx = TypedInputContextBuilder::new(&d.input_schema).build();
     assert_eq!(evaluate(&d, &ctx, "").unwrap_err(), EvalError::NoMatch);
 }
@@ -525,12 +525,12 @@ fn eval_matched_with_ctx(
     cat: &dmn_lite_compiler::Catalogue,
     ctx: TypedInputContext,
 ) -> bool {
-    let d = compile(parse(src).unwrap(), cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), cat).unwrap();
     evaluate(&d, &ctx, "").is_ok_and(|o| o.output.get(FieldId(0)) == &TypedValue::Integer(1))
 }
 
 fn null_ctx(src: &str, cat: &dmn_lite_compiler::Catalogue) -> TypedInputContext {
-    let d = compile(parse(src).unwrap(), cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), cat).unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set_null(FieldId(0));
     b.build()
@@ -556,7 +556,7 @@ fn test_null_neq_returns_false() {
 fn test_null_in_set_returns_false() {
     let cat = enum_ab_cat();
     let src = "(define-decision d :hit-policy first :inputs ((x :type enum :domain AB)) :outputs ((matched :type enum :domain R)) :rules ((rule r1 :when ((x in (A B))) :then ((matched = OK))) (rule r0 :when (*) :then ((matched = OK)))))";
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set_null(FieldId(0));
     let out = evaluate(&d, &b.build(), "").unwrap();
@@ -596,7 +596,7 @@ fn test_is_not_null_matches_non_null() {
 fn test_trace_length_equals_rule_count() {
     let src = include_str!("../../dmn-lite-parser/tests/fixtures/booking_eligibility.dmn-lite");
     let cat = cat();
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set_by_name("jurisdiction", enum_val("Jurisdiction", "LU", &cat))
         .unwrap();
@@ -620,7 +620,7 @@ fn test_trace_length_equals_rule_count() {
 fn test_trace_matched_equals_predicate_conjunction() {
     let cat = mini_cat(int_domain());
     let src = "(define-decision d :hit-policy first :inputs ((x :type integer :domain N)) :outputs ((y :type integer :domain N)) :rules ((rule r1 :when ((x > 0) (x < 10)) :then ((y = 1))) (rule r0 :when (*) :then ((y = 0)))))";
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set(FieldId(0), TypedValue::Integer(5));
     let out = evaluate(&d, &b.build(), "").unwrap();
@@ -633,7 +633,7 @@ fn test_trace_matched_equals_predicate_conjunction() {
 fn test_trace_predicates_source_order() {
     let cat = mini_cat(int_domain());
     let src = "(define-decision d :hit-policy first :inputs ((x :type integer :domain N)) :outputs ((y :type integer :domain N)) :rules ((rule r1 :when ((x > 0) (x < 10)) :then ((y = 1))) (rule r0 :when (*) :then ((y = 0)))))";
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set(FieldId(0), TypedValue::Integer(5));
     let out = evaluate(&d, &b.build(), src).unwrap();
@@ -648,7 +648,7 @@ fn test_trace_predicates_source_order() {
 fn test_trace_outcome_matches_return() {
     let cat = mini_cat(int_domain());
     let src = "(define-decision d :hit-policy unique :inputs ((x :type integer :domain N)) :outputs ((y :type integer :domain N)) :rules ((rule r1 :when ((x = 5)) :then ((y = 1)))))";
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
     let err_out = evaluate(
         &d,
         &TypedInputContextBuilder::new(&d.input_schema).build(),
@@ -662,7 +662,7 @@ fn test_trace_outcome_matches_return() {
 fn test_catch_all_trace_has_one_entry() {
     let cat = mini_cat(int_domain());
     let src = "(define-decision d :hit-policy unique :inputs ((x :type integer :domain N)) :outputs ((y :type integer :domain N)) :rules ((rule r1 :when (*) :then ((y = 1)))))";
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
     let ctx = TypedInputContextBuilder::new(&d.input_schema).build();
     let out = evaluate(&d, &ctx, "").unwrap();
     assert_eq!(out.trace.rules[0].predicates.len(), 1);
@@ -744,7 +744,7 @@ fn test_no_short_circuit_implicit_conjunction() {
     // Rule has two predicates. First is false. Both must appear in trace.
     let cat = mini_cat(int_domain());
     let src = "(define-decision d :hit-policy first :inputs ((x :type integer :domain N)) :outputs ((y :type integer :domain N)) :rules ((rule r1 :when ((x = 99) (x > 0)) :then ((y = 1))) (rule r0 :when (*) :then ((y = 0)))))";
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set(FieldId(0), TypedValue::Integer(5));
     let out = evaluate(&d, &b.build(), "").unwrap();
@@ -766,7 +766,7 @@ fn test_no_short_circuit_or_evaluates_all() {
     // (or false true) → both sub-predicates evaluated (result = true)
     let cat = mini_cat(int_domain());
     let src = "(define-decision d :hit-policy first :inputs ((x :type integer :domain N)) :outputs ((y :type integer :domain N)) :rules ((rule r1 :when ((or (x = 99) (x > 0))) :then ((y = 1))) (rule r0 :when (*) :then ((y = 0)))))";
-    let d = compile(parse(src).unwrap(), &cat).unwrap();
+    let d = compile_to_ir(parse(src).unwrap(), &cat).unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set(FieldId(0), TypedValue::Integer(5)); // x != 99 (false), x > 0 (true) → or = true
     let out = evaluate(&d, &b.build(), "").unwrap();

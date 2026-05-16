@@ -158,3 +158,59 @@ impl fmt::Display for DecisionId {
 /// stable across Rust versions or process restarts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SchemaHash(pub u64);
+
+// ── Bytecode pool index types ─────────────────────────────────────────────────
+
+/// Index into `CompiledDecision::const_pool`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ConstId(pub u32);
+
+/// Index into `CompiledDecision::const_set_pool`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ConstSetId(pub u32);
+
+/// Index into `CompiledDecision::range_pool`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct RangeId(pub u32);
+
+/// Ordinal index of an output field in the output schema.
+///
+/// Used by `StoreOutput` / `StoreOutputTos` to identify which output slot
+/// receives the stored value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct OutputFieldId(pub u32);
+
+// ── Reserved future-profile IDs ───────────────────────────────────────────────
+// These exist so the Instr enum can declare v0.2+ variants now
+// (reserved, emitter-never-produces, verifier-rejects).
+
+/// Identifier for a governed function / BKM (Profile v0.5+).
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BkmId(pub u32);
+
+/// Identifier for a quantifier bound variable (Profile v0.2+).
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BindingId(pub u32);
+
+/// Identifier for a path expression (Profile v0.4+).
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PathId(pub u32);
+
+/// Aggregation operation kind for `AggregateBegin` (Profile v0.2+).
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AggregateOpKind {
+    /// Count of matching elements.
+    Count,
+    /// Sum of numeric values.
+    Sum,
+    /// Minimum numeric value.
+    Min,
+    /// Maximum numeric value.
+    Max,
+    /// Arithmetic mean of numeric values.
+    Mean,
+}

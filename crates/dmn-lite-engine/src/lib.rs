@@ -1,4 +1,4 @@
-//! dmn-lite engine: reference evaluator and (future) bytecode stack VM.
+//! dmn-lite engine: reference evaluator and bytecode stack VM.
 //!
 //! Two evaluators share the same input/output contract:
 //!
@@ -6,10 +6,11 @@
 //!   (Phase 1.3). Used as the differential testing oracle for the VM.
 //!   Correct but not optimised; never short-circuits.
 //!
-//! - [`vm`] module: production bytecode stack machine (Phase 1.4, stub).
+//! - [`vm`] module: production bytecode stack machine (Phase 1.4). Accepts
+//!   only a [`VerifiedDecision`] produced by the bytecode verifier.
 //!
 //! The engine depends only on `dmn-lite-types`. It has no knowledge of the
-//! compiler implementation — only of the [`TypedDecision`] artifact shape.
+//! compiler implementation — only of the [`VerifiedDecision`] artifact shape.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -17,24 +18,21 @@
 pub mod reference;
 pub mod vm;
 
-use dmn_lite_types::ir::TypedDecision;
+use dmn_lite_types::compiled::VerifiedDecision;
 use dmn_lite_types::{EvalError, TypedInputContext};
 
 pub use reference::{EvaluationOutput, evaluate as reference_evaluate};
 
-/// Evaluate a compiled decision against a typed input context.
+/// Evaluate a verified decision against a typed input context using the
+/// production stack VM.
 ///
-/// **Phase 1.3:** delegates to [`reference::evaluate`]. Phase 1.4 will
-/// re-route this to the bytecode VM, retaining the reference evaluator as a
-/// debugging/oracle mode.
-///
-/// The `source` string is forwarded to the reference evaluator for
-/// human-readable predicate descriptions in the evaluation trace. Pass `""`
-/// if the original source is unavailable.
+/// The `source` string is forwarded to the VM for human-readable predicate
+/// descriptions in the evaluation trace. Pass `""` if the original source is
+/// unavailable.
 pub fn evaluate(
-    decision: &TypedDecision,
+    decision: &VerifiedDecision,
     input: &TypedInputContext,
     source: &str,
 ) -> Result<EvaluationOutput, EvalError> {
-    reference::evaluate(decision, input, source)
+    vm::evaluate(decision, input, source)
 }

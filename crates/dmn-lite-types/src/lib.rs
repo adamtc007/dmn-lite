@@ -20,11 +20,17 @@ pub mod trace;
 pub mod values;
 
 pub use catalogue::{Catalogue, Domain, DomainValue};
-pub use compiled::{AnalysisReport, CompiledDecision};
+pub use compiled::{
+    AnalysisReport, ArtifactHash, CompileContext, CompiledDecision, RangeEntry, RuleMapEntry,
+    VerifiedDecision,
+};
 pub use errors::{CatalogueError, CompileError, CompileWarning, EvalError, ParseError};
 pub use ids::{
-    DecisionId, DomainId, FieldId, NumberKind, RuleId, SchemaHash, SnapshotId, SourceSpan, ValueId,
+    AggregateOpKind, BkmId, BindingId, ConstId, ConstSetId, DecisionId, DomainId, FieldId,
+    NumberKind, OutputFieldId, PathId, RangeId, RuleId, SchemaHash, SnapshotId, SourceSpan,
+    ValueId,
 };
+pub use instr::Instr;
 pub use trace::{EvaluationTrace, PredicateTrace, RuleTrace, TraceOutcome};
 pub use values::{
     InputContextError, TypedInputContext, TypedInputContextBuilder, TypedOutputContext,
