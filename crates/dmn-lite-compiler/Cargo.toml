@@ -11,3 +11,7 @@ description = "dmn-lite compiler: AST to typed predicate IR to bytecode"
 [dependencies]
 dmn-lite-types = { path = "../dmn-lite-types" }
 dmn-lite-parser = { path = "../dmn-lite-parser" }
+serde = { workspace = true }
+toml = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }

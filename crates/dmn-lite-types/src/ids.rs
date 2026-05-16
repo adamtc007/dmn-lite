@@ -2,6 +2,8 @@
 
 use std::fmt;
 
+use uuid::Uuid;
+
 /// Byte-offset span into the original source text.
 ///
 /// Every AST and IR node carries a span so that diagnostics can point at the
@@ -60,4 +62,90 @@ pub enum NumberKind {
     Integer,
     /// Has a decimal point: `3.14`, `-0.5`.
     Decimal,
+}
+
+// ── Catalogue identity types ──────────────────────────────────────────────────
+
+/// Unique identifier for a Sem OS catalogue snapshot.
+///
+/// Stored as a UUIDv7 (RFC 9562). The timestamp prefix provides
+/// chronological ordering; the random suffix ensures global uniqueness.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SnapshotId(pub Uuid);
+
+/// Unique identifier for an enum domain within the Sem OS catalogue.
+///
+/// Stored as a UUIDv7. Stable across catalogue snapshot versions when the
+/// domain itself is unchanged; a new `DomainId` is issued when the domain
+/// is superseded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DomainId(pub Uuid);
+
+/// Unique identifier for a single enum value within a domain.
+///
+/// Stored as a UUIDv7. Together with its parent `DomainId`, a `ValueId`
+/// forms the early-bound canonical reference to an enum literal in compiled
+/// decisions and audit logs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ValueId(pub Uuid);
+
+impl fmt::Display for SnapshotId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl fmt::Display for DomainId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl fmt::Display for ValueId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+// ── IR identity types ─────────────────────────────────────────────────────────
+
+/// Ordinal index of a field in a decision's input or output schema.
+///
+/// `FieldId(0)` is the first declared input/output; indices are assigned
+/// in source order and are stable for the lifetime of a compiled decision.
+/// The evaluator uses `FieldId` as the key into `TypedInputContext` and
+/// `TypedOutputContext`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct FieldId(pub usize);
+
+/// Ordinal index of a rule in a decision's rule list.
+///
+/// `RuleId(0)` is the first rule in source order. Used by the evaluator to
+/// record which rule matched and by the hit-policy accumulator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct RuleId(pub usize);
+
+/// Identifier for a compiled decision.
+///
+/// Derived from the `:decision-id` string literal if present, or from the
+/// decision name symbol otherwise.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DecisionId(pub String);
+
+impl fmt::Display for FieldId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "field#{}", self.0)
+    }
+}
+
+impl fmt::Display for RuleId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "rule#{}", self.0)
+    }
+}
+
+impl fmt::Display for DecisionId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
 }

@@ -1,8 +1,10 @@
-//! Error vocabulary for dmn-lite.
+//! Error and warning vocabulary for dmn-lite.
 
 use thiserror::Error;
 
 use crate::ids::SourceSpan;
+
+// ── Parse errors ──────────────────────────────────────────────────────────────
 
 /// Lexical or syntactic errors produced by `dmn-lite-parser`.
 ///
@@ -152,13 +154,379 @@ pub enum ParseError {
     },
 }
 
-/// Compiler errors. Variants added in Phases 1.2–1.4.
-#[derive(Debug, Error)]
-pub enum CompileError {
-    /// Placeholder. Real variants added in Phase 1.2.
-    #[error("compile error: unimplemented in Phase 1.0")]
-    Unimplemented,
+// ── Catalogue errors ──────────────────────────────────────────────────────────
+
+/// Errors produced while loading or validating a Sem OS catalogue.
+///
+/// All fields use owned `String` values (not `std::io::Error` or
+/// `toml::de::Error`) so that `CatalogueError` can derive `Clone + PartialEq
+/// + Eq` and be embedded in `CompileError`.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum CatalogueError {
+    /// The catalogue file could not be read from disk.
+    #[error("failed to read catalogue file '{path}': {message}")]
+    Io {
+        /// Path to the catalogue file.
+        path: String,
+        /// OS error message.
+        message: String,
+    },
+
+    /// The catalogue file is not valid TOML.
+    #[error("failed to parse catalogue TOML: {message}")]
+    Toml {
+        /// TOML parse error message.
+        message: String,
+    },
+
+    /// A `domain_id` field is not a valid UUIDv7.
+    #[error("invalid domain_id '{value}' for domain '{domain_name}': not a valid UUIDv7")]
+    InvalidDomainId {
+        /// The domain whose ID is malformed.
+        domain_name: String,
+        /// The raw string that failed to parse.
+        value: String,
+    },
+
+    /// A `value_id` field is not a valid UUIDv7.
+    #[error(
+        "invalid value_id '{value}' for symbol '{symbol}' in domain '{domain_name}': not a valid UUIDv7"
+    )]
+    InvalidValueId {
+        /// The domain containing the malformed value.
+        domain_name: String,
+        /// The value symbol whose ID is malformed.
+        symbol: String,
+        /// The raw string that failed to parse.
+        value: String,
+    },
+
+    /// The `snapshot_id` field is not a valid UUIDv7.
+    #[error("invalid snapshot_id '{value}': not a valid UUIDv7")]
+    InvalidSnapshotId {
+        /// The raw string that failed to parse.
+        value: String,
+    },
+
+    /// Two domains share the same name.
+    #[error("duplicate domain name '{name}' in catalogue")]
+    DuplicateDomainName {
+        /// The repeated domain name.
+        name: String,
+    },
+
+    /// Two domains share the same `domain_id`.
+    #[error(
+        "duplicate domain_id '{value}' in catalogue (used by '{first_domain}' and '{second_domain}')"
+    )]
+    DuplicateDomainId {
+        /// The repeated UUID.
+        value: String,
+        /// Name of the domain that first used this ID.
+        first_domain: String,
+        /// Name of the domain that reused this ID.
+        second_domain: String,
+    },
+
+    /// Two values within a domain share the same symbol.
+    #[error("duplicate value symbol '{symbol}' in domain '{domain_name}'")]
+    DuplicateValueSymbol {
+        /// The domain containing the duplicate.
+        domain_name: String,
+        /// The repeated symbol.
+        symbol: String,
+    },
+
+    /// Two values within a domain share the same `value_id`.
+    #[error(
+        "duplicate value_id '{value}' in domain '{domain_name}' (used by '{first_symbol}' and '{second_symbol}')"
+    )]
+    DuplicateValueId {
+        /// The domain containing the duplicate.
+        domain_name: String,
+        /// The repeated UUID.
+        value: String,
+        /// Symbol that first used this ID.
+        first_symbol: String,
+        /// Symbol that reused this ID.
+        second_symbol: String,
+    },
 }
+
+// ── Compile errors ────────────────────────────────────────────────────────────
+
+/// Static semantic errors produced by `dmn-lite-compiler::compile()`.
+///
+/// Every variant carries a [`SourceSpan`] pointing at the offending AST node.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum CompileError {
+    // ── Catalogue resolution ────────────────────────────────────────────────
+    /// A `:domain` reference names a domain not present in the catalogue.
+    #[error("unknown domain '{name}'")]
+    UnknownDomain {
+        /// The unresolved domain name.
+        name: String,
+        /// Location of the domain reference.
+        span: SourceSpan,
+    },
+
+    /// An enum literal does not belong to the declared domain.
+    #[error("value '{symbol}' is not a member of domain '{domain}'")]
+    UnknownDomainValue {
+        /// The domain the literal was checked against.
+        domain: String,
+        /// The unresolved literal symbol.
+        symbol: String,
+        /// Location of the literal.
+        span: SourceSpan,
+    },
+
+    // ── Type / domain consistency ───────────────────────────────────────────
+    /// An `enum`-typed field is missing its required `:domain` clause.
+    #[error("enum-typed field '{field}' requires a :domain clause")]
+    MissingDomainOnEnum {
+        /// The field name.
+        field: String,
+        /// Location of the field declaration.
+        span: SourceSpan,
+    },
+
+    // ── Field reference resolution ──────────────────────────────────────────
+    /// A predicate references an input field that was not declared.
+    #[error("unknown input field '{name}'")]
+    UnknownInputField {
+        /// The unresolved field name.
+        name: String,
+        /// Location of the field reference.
+        span: SourceSpan,
+    },
+
+    /// An assignment references an output field that was not declared.
+    #[error("unknown output field '{name}'")]
+    UnknownOutputField {
+        /// The unresolved field name.
+        name: String,
+        /// Location of the field reference.
+        span: SourceSpan,
+    },
+
+    // ── Duplicate declarations ──────────────────────────────────────────────
+    /// Two input fields share the same name.
+    #[error("duplicate input field name '{name}'")]
+    DuplicateInputField {
+        /// The repeated field name.
+        name: String,
+        /// Location of the second declaration.
+        span: SourceSpan,
+        /// Location of the first declaration.
+        previous: SourceSpan,
+    },
+
+    /// Two output fields share the same name.
+    #[error("duplicate output field name '{name}'")]
+    DuplicateOutputField {
+        /// The repeated field name.
+        name: String,
+        /// Location of the second declaration.
+        span: SourceSpan,
+        /// Location of the first declaration.
+        previous: SourceSpan,
+    },
+
+    /// Two rules share the same identifier.
+    #[error("duplicate rule identifier '{name}'")]
+    DuplicateRuleId {
+        /// The repeated rule identifier.
+        name: String,
+        /// Location of the second rule.
+        span: SourceSpan,
+        /// Location of the first rule.
+        previous: SourceSpan,
+    },
+
+    // ── Predicate type checking ─────────────────────────────────────────────
+    /// A literal's type does not match the field's declared type.
+    #[error(
+        "type mismatch in predicate: field '{field}' has type '{field_type}', literal has type '{literal_type}'"
+    )]
+    PredicateTypeMismatch {
+        /// The field being tested.
+        field: String,
+        /// The field's declared type.
+        field_type: String,
+        /// The literal's inferred type.
+        literal_type: String,
+        /// Location of the predicate.
+        span: SourceSpan,
+    },
+
+    /// An ordered comparison (`<`, `<=`, `>`, `>=`) was used on a non-numeric field.
+    #[error(
+        "ordered comparison ({op}) is only valid for numeric fields; '{field}' has type '{field_type}'"
+    )]
+    OrderedComparisonOnNonNumeric {
+        /// The field name.
+        field: String,
+        /// The field's declared type.
+        field_type: String,
+        /// The comparison operator used.
+        op: String,
+        /// Location of the predicate.
+        span: SourceSpan,
+    },
+
+    /// A range predicate was used on a non-numeric field.
+    #[error("range predicate is only valid for numeric fields; '{field}' has type '{field_type}'")]
+    RangeOnNonNumeric {
+        /// The field name.
+        field: String,
+        /// The field's declared type.
+        field_type: String,
+        /// Location of the range predicate.
+        span: SourceSpan,
+    },
+
+    /// A set-membership predicate contains an element that doesn't match the field type.
+    #[error(
+        "set members must share the type of field '{field}' ({field_type}); element {index} has type '{element_type}'"
+    )]
+    SetMemberTypeMismatch {
+        /// The field name.
+        field: String,
+        /// The field's declared type.
+        field_type: String,
+        /// The element's inferred type.
+        element_type: String,
+        /// Zero-based index of the offending element.
+        index: usize,
+        /// Location of the offending element.
+        span: SourceSpan,
+    },
+
+    // ── Assignment type checking ────────────────────────────────────────────
+    /// An assignment value's type does not match the output field's declared type.
+    #[error(
+        "type mismatch in assignment: output '{output}' has type '{output_type}', literal has type '{literal_type}'"
+    )]
+    AssignmentTypeMismatch {
+        /// The output field name.
+        output: String,
+        /// The field's declared type.
+        output_type: String,
+        /// The literal's inferred type.
+        literal_type: String,
+        /// Location of the assignment.
+        span: SourceSpan,
+    },
+
+    // ── Rule structural checks ──────────────────────────────────────────────
+    /// A rule does not assign a value to every declared output field.
+    #[error("rule '{rule}' is missing assignment for output '{output}'")]
+    MissingOutputAssignment {
+        /// The rule identifier.
+        rule: String,
+        /// The output field that was not assigned.
+        output: String,
+        /// Span of the rule's `:then` block.
+        span: SourceSpan,
+    },
+
+    /// A rule assigns the same output field more than once.
+    #[error("rule '{rule}' assigns output '{output}' more than once")]
+    DuplicateOutputAssignment {
+        /// The rule identifier.
+        rule: String,
+        /// The output field assigned twice.
+        output: String,
+        /// Location of the second assignment.
+        span: SourceSpan,
+        /// Location of the first assignment.
+        previous: SourceSpan,
+    },
+
+    // ── Catch-all rules ─────────────────────────────────────────────────────
+    /// The decision contains more than one catch-all rule.
+    #[error("decision contains multiple catch-all rules")]
+    MultipleCatchAllRules {
+        /// Location of the second catch-all.
+        span: SourceSpan,
+        /// Location of the first catch-all.
+        previous: SourceSpan,
+    },
+
+    /// Under `FIRST` hit policy, a normal rule follows a catch-all and is unreachable.
+    #[error("under FIRST hit policy, rule '{rule}' is unreachable: preceded by a catch-all rule")]
+    UnreachableAfterCatchAll {
+        /// The unreachable rule's identifier.
+        rule: String,
+        /// Location of the unreachable rule.
+        span: SourceSpan,
+        /// Location of the preceding catch-all.
+        catch_all: SourceSpan,
+    },
+
+    // ── Structural errors ───────────────────────────────────────────────────
+    /// A decision declares no input fields.
+    #[error("decision must declare at least one input field")]
+    EmptyInputs {
+        /// Span of the `:inputs` block.
+        span: SourceSpan,
+    },
+
+    /// A decision declares no output fields.
+    #[error("decision must declare at least one output field")]
+    EmptyOutputs {
+        /// Span of the `:outputs` block.
+        span: SourceSpan,
+    },
+
+    // ── Catalogue wrapper ────────────────────────────────────────────────────
+    /// A catalogue-level error propagated into compilation.
+    #[error("catalogue error: {source}")]
+    Catalogue {
+        /// The underlying catalogue error.
+        #[from]
+        source: CatalogueError,
+    },
+}
+
+// ── Compile warnings ──────────────────────────────────────────────────────────
+
+/// Non-fatal diagnostics produced by `dmn-lite-compiler::compile()`.
+///
+/// A compile succeeds even when warnings are present. Warnings are surfaced
+/// through `CompileErrors::warnings` so callers can decide whether to surface
+/// them to authors.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompileWarning {
+    /// A non-enum field declares a `:domain` clause.
+    ///
+    /// In Profile v0.1, domain references on `bool`, `integer`, `decimal`, and
+    /// `string` fields are resolved (the domain must exist in the catalogue) but
+    /// value-level membership is not enforced. The domain reference is preserved
+    /// on the `FieldSchema` for future profile compatibility. This warning alerts
+    /// authors that the domain is advisory, not enforced.
+    DomainOnNonEnum {
+        /// The field name.
+        field: String,
+        /// The field's type keyword.
+        type_name: String,
+        /// The domain name as written.
+        domain: String,
+        /// Location of the `:domain` clause.
+        span: SourceSpan,
+    },
+
+    /// A decision declares no rules.
+    ///
+    /// A decision with no rules always returns `NoMatch` regardless of input.
+    EmptyRules {
+        /// Span of the `:rules` block.
+        span: SourceSpan,
+    },
+}
+
+// ── Legacy stubs ──────────────────────────────────────────────────────────────
 
 /// Evaluation errors. Variants added in Phase 1.4.
 #[derive(Debug, Error)]
