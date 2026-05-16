@@ -22,33 +22,29 @@ fn enum_val(cat: &dmn_lite_compiler::Catalogue, domain: &str, sym: &str) -> Type
     }
 }
 
-/// The booking_eligibility fixture uses UNIQUE hit policy with a catch-all r999.
-/// Under UNIQUE, r999 always fires — so any input that ALSO matches r001 would
-/// give MultipleMatches (correct evaluator behaviour). The vertical slice is
-/// proven by supplying an input where only r999 matches: a non-LU/non-UNKNOWN
-/// input that misses r001 and r002, landing exclusively on the catch-all.
+/// Primary vertical-slice proof: source → AST → typed IR → evaluation → output.
+/// Uses r001 conditions on the booking_eligibility FIRST decision.
 #[test]
-fn vertical_slice_booking_eligibility_catch_all_unique() {
+fn vertical_slice_booking_eligibility_r001_match() {
     let ast = parse(BOOKING_SRC).expect("source should parse");
     let catalogue = load_catalogue_from_str(STUB).expect("catalogue must load");
     let decision = compile(ast, &catalogue).expect("source should compile");
 
     assert_eq!(decision.name, "booking-eligibility");
     assert_eq!(decision.input_schema.len(), 5);
+    assert_eq!(decision.output_schema.len(), 2);
     assert_eq!(decision.rules.len(), 3);
 
-    // Input that misses r001 (jurisdiction != LU) and r002 (source-of-funds != UNKNOWN)
-    // → only the catch-all r999 fires under UNIQUE.
     let mut b = TypedInputContextBuilder::new(&decision.input_schema);
-    b.set_by_name("jurisdiction", enum_val(&catalogue, "Jurisdiction", "US"))
+    b.set_by_name("jurisdiction", enum_val(&catalogue, "Jurisdiction", "LU"))
         .unwrap();
-    b.set_by_name("client-type", enum_val(&catalogue, "CbuType", "CORPORATE"))
+    b.set_by_name("client-type", enum_val(&catalogue, "CbuType", "SICAV"))
         .unwrap();
-    b.set_by_name("product", enum_val(&catalogue, "ProductCode", "DEPOSITARY"))
+    b.set_by_name("product", enum_val(&catalogue, "ProductCode", "CUSTODY"))
         .unwrap();
     b.set_by_name(
         "booking-principal",
-        enum_val(&catalogue, "BookingPrincipal", "BNY_US"),
+        enum_val(&catalogue, "BookingPrincipal", "BNY_LUX"),
     )
     .unwrap();
     b.set_by_name(
@@ -57,18 +53,21 @@ fn vertical_slice_booking_eligibility_catch_all_unique() {
     )
     .unwrap();
 
-    let result =
-        evaluate(&decision, &b.build(), BOOKING_SRC).expect("only r999 matches → UNIQUE succeeds");
+    let result = evaluate(&decision, &b.build(), BOOKING_SRC).expect("r001 must match under FIRST");
 
+    // FIRST returns r001 (index 0); r999 catch-all also evaluates true but
+    // FIRST has already resolved.
     assert_eq!(
         result.trace.outcome,
-        TraceOutcome::Match { rule_id: RuleId(2) },
-        "catch-all r999 (index 2) must be the sole match"
+        TraceOutcome::Match { rule_id: RuleId(0) }
     );
     assert_eq!(result.trace.rules.len(), 3);
-    assert!(!result.trace.rules[0].matched, "r001 must not match");
-    assert!(!result.trace.rules[1].matched, "r002 must not match");
-    assert!(result.trace.rules[2].matched, "r999 catch-all must match");
+    assert!(result.trace.rules[0].matched, "r001 matched");
+    assert!(!result.trace.rules[1].matched, "r002 not matched");
+    assert!(
+        result.trace.rules[2].matched,
+        "r999 catch-all evaluates true (FIRST already resolved)"
+    );
 
     let eligibility = result
         .output
@@ -76,18 +75,19 @@ fn vertical_slice_booking_eligibility_catch_all_unique() {
         .unwrap();
     assert_eq!(
         eligibility,
-        &enum_val(&catalogue, "EligibilityOutcome", "NOT_ELIGIBLE")
+        &enum_val(&catalogue, "EligibilityOutcome", "ELIGIBLE")
     );
+
     let reason = result
         .output
         .get_by_name(&decision.output_schema, "reason-code")
         .unwrap();
     assert_eq!(
         reason,
-        &enum_val(&catalogue, "BookingReasonCode", "NO_MATCH")
+        &enum_val(&catalogue, "BookingReasonCode", "STANDARD_LUX_SICAV")
     );
 
-    // Predicate descriptions non-empty (source supplied)
+    // Predicate descriptions non-empty (source was supplied)
     for rule_trace in &result.trace.rules {
         for pred in &rule_trace.predicates {
             assert!(

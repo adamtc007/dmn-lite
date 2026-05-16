@@ -1,7 +1,10 @@
-; EBNF §5.1 — booking eligibility (UNIQUE, multiple outputs)
+; EBNF §5.1 — booking eligibility (FIRST, multiple outputs)
+; FIRST is correct here: the catch-all r999 is a fallback, meaning earlier
+; specific rules are expected to overlap with it. UNIQUE would require strict
+; mutual exclusivity, which a catch-all structurally prevents.
 (define-decision booking-eligibility
   :decision-id "booking_eligibility.v1"
-  :hit-policy unique
+  :hit-policy first
   :inputs
     ((jurisdiction      :type enum :domain Jurisdiction)
      (client-type       :type enum :domain CbuType)

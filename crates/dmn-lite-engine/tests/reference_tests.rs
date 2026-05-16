@@ -147,16 +147,10 @@ fn test_explicit_null_distinguishable_from_missing_at_api_level() {
 
 #[test]
 fn test_ebnf_51_eligibility_match_r001() {
-    // booking_eligibility uses UNIQUE hit policy with a catch-all r999.
-    // Under UNIQUE, r999 always fires alongside any other matching rule →
-    // MultipleMatches. We verify: (a) the decision compiles, (b) r001's
-    // predicates evaluate true via the trace, (c) catch-all-only input succeeds.
     let src = include_str!("../../dmn-lite-parser/tests/fixtures/booking_eligibility.dmn-lite");
     let cat = cat();
     let d = compile(parse(src).unwrap(), &cat).unwrap();
 
-    // Input matching r001 conditions — evaluator correctly reports MultipleMatches
-    // (r001 AND r999 both fire under UNIQUE).
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set_by_name("jurisdiction", enum_val("Jurisdiction", "LU", &cat))
         .unwrap();
@@ -173,19 +167,40 @@ fn test_ebnf_51_eligibility_match_r001() {
         .unwrap();
     let ctx = b.build();
 
-    // This produces MultipleMatches — correct: r001 + r999 both evaluate true.
-    let err = evaluate(&d, &ctx, src).unwrap_err();
+    let out = evaluate(&d, &ctx, src).expect("r001 must match under FIRST");
+    // FIRST returns the first matching rule (r001, index 0).
+    // r999 (catch-all) also evaluates true but FIRST has already returned.
+    assert_eq!(
+        out.trace.outcome,
+        TraceOutcome::Match { rule_id: RuleId(0) }
+    );
+    assert_eq!(out.trace.rules.len(), 3);
+    assert!(out.trace.rules[0].matched, "r001 matched");
+    assert!(!out.trace.rules[1].matched, "r002 not matched");
     assert!(
-        matches!(err, EvalError::MultipleMatches { ref rules } if rules.contains(&RuleId(0)) && rules.contains(&RuleId(2))),
-        "r001 and r999 both match → MultipleMatches: {err:?}"
+        out.trace.rules[2].matched,
+        "r999 catch-all evaluates true (but FIRST already resolved)"
     );
 
-    // The trace is recoverable via compile_with_warnings for structural checks:
-    // r001's predicates must all be true (verified via compile_with_warnings
-    // which shows the IR — the predicate logic is tested in category 3 tests).
-    assert_eq!(d.rules.len(), 3);
-    assert_eq!(d.input_schema.len(), 5);
-    assert_eq!(d.output_schema.len(), 2);
+    let eligibility = out
+        .output
+        .get_by_name(&d.output_schema, "eligibility")
+        .unwrap();
+    assert_eq!(
+        eligibility,
+        &enum_val("EligibilityOutcome", "ELIGIBLE", &cat)
+    );
+    let reason = out
+        .output
+        .get_by_name(&d.output_schema, "reason-code")
+        .unwrap();
+    assert_eq!(
+        reason,
+        &enum_val("BookingReasonCode", "STANDARD_LUX_SICAV", &cat)
+    );
+    // r001 has 5 predicates, all true for this input
+    assert_eq!(out.trace.rules[0].predicates.len(), 5);
+    assert!(out.trace.rules[0].predicates.iter().all(|p| p.result));
 }
 
 #[test]
@@ -276,12 +291,10 @@ fn test_ebnf_53_kyc_approved() {
 // ─── Category 3: Predicate kind correctness ───────────────────────────────────
 
 fn eval_matched(src: &str, cat: &dmn_lite_compiler::Catalogue, x: TypedValue) -> bool {
-    // Force FIRST for decisions with a catch-all fallback.
-    let src = src.replace(":hit-policy unique", ":hit-policy first");
-    let d = compile(parse(&src).unwrap(), cat).unwrap();
+    let d = compile(parse(src).unwrap(), cat).unwrap();
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
     b.set(FieldId(0), x);
-    let out = evaluate(&d, &b.build(), &src).expect("eval");
+    let out = evaluate(&d, &b.build(), src).expect("eval");
     out.output.get(FieldId(0)) == &TypedValue::Integer(1)
 }
 
@@ -512,8 +525,7 @@ fn eval_matched_with_ctx(
     cat: &dmn_lite_compiler::Catalogue,
     ctx: TypedInputContext,
 ) -> bool {
-    let src = src.replace(":hit-policy unique", ":hit-policy first");
-    let d = compile(parse(&src).unwrap(), cat).unwrap();
+    let d = compile(parse(src).unwrap(), cat).unwrap();
     evaluate(&d, &ctx, "").is_ok_and(|o| o.output.get(FieldId(0)) == &TypedValue::Integer(1))
 }
 
@@ -585,22 +597,22 @@ fn test_trace_length_equals_rule_count() {
     let src = include_str!("../../dmn-lite-parser/tests/fixtures/booking_eligibility.dmn-lite");
     let cat = cat();
     let d = compile(parse(src).unwrap(), &cat).unwrap();
-    // Use input that only matches the catch-all (UNIQUE succeeds with 1 match)
     let mut b = TypedInputContextBuilder::new(&d.input_schema);
-    b.set_by_name("jurisdiction", enum_val("Jurisdiction", "US", &cat))
+    b.set_by_name("jurisdiction", enum_val("Jurisdiction", "LU", &cat))
         .unwrap();
-    b.set_by_name("client-type", enum_val("CbuType", "CORPORATE", &cat))
+    b.set_by_name("client-type", enum_val("CbuType", "SICAV", &cat))
         .unwrap();
-    b.set_by_name("product", enum_val("ProductCode", "DEPOSITARY", &cat))
+    b.set_by_name("product", enum_val("ProductCode", "CUSTODY", &cat))
         .unwrap();
     b.set_by_name(
         "booking-principal",
-        enum_val("BookingPrincipal", "BNY_US", &cat),
+        enum_val("BookingPrincipal", "BNY_LUX", &cat),
     )
     .unwrap();
     b.set_by_name("source-of-funds", enum_val("SourceOfFunds", "SALARY", &cat))
         .unwrap();
     let out = evaluate(&d, &b.build(), src).unwrap();
+    // FIRST: trace covers all 3 rules regardless of which fired.
     assert_eq!(out.trace.rules.len(), d.rules.len());
 }
 

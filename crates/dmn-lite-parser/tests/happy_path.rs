@@ -19,7 +19,7 @@ fn test_booking_eligibility_parses() {
         d.decision_id.as_ref().unwrap().value,
         "booking_eligibility.v1"
     );
-    assert!(matches!(d.hit_policy, HitPolicyAst::Unique(_)));
+    assert!(matches!(d.hit_policy, HitPolicyAst::First(_)));
     assert_eq!(d.inputs.len(), 5);
     assert_eq!(d.outputs.len(), 2);
     assert_eq!(d.rules.len(), 3);

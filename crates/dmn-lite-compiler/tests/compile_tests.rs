@@ -62,7 +62,7 @@ fn test_compile_ebnf_51_booking_eligibility() {
     let cat = stub_cat();
     let decision = compile(parse_ok(src), &cat).expect("§5.1 must compile");
     assert_eq!(decision.name, "booking-eligibility");
-    assert!(matches!(decision.hit_policy, HitPolicy::Unique));
+    assert!(matches!(decision.hit_policy, HitPolicy::First));
     assert_eq!(decision.input_schema.len(), 5);
     assert_eq!(decision.output_schema.len(), 2);
     assert_eq!(decision.rules.len(), 3);
